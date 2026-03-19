@@ -25,8 +25,9 @@ app.get('/api/health', (req, res) => {
 const authRoutes = require('./src/routes/auth.routes')
 console.log('authRoutes type:', typeof authRoutes)
 app.use('/api/auth', authRoutes)
+app.use('/api/admin', require('./src/routes/clinic.routes'))
 // ── Routes (add each as you build them) ───────────────────────────────────────
-app.use('/api/auth',      require('./src/routes/auth.routes'))
+// app.use('/api/auth',      require('./src/routes/auth.routes'))
 // app.use('/api/admin',     require('./src/routes/clinic.routes'))
 // app.use('/api/patients',  require('./src/routes/patient.routes'))
 // app.use('/api/tokens',    require('./src/routes/token.routes'))

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { Menu, X, Stethoscope, LogOut, ChevronDown } from 'lucide-react'
 
@@ -15,6 +15,10 @@ const Navbar = () => {
   const [profileOpen, setProfileOpen] = useState(false)
   const { user, logout }              = useAuth()
   const navigate                      = useNavigate()
+  const location                      = useLocation()
+
+  // Only show anchor nav links on the homepage
+  const isHomePage = location.pathname === '/'
 
   const handleLogout = () => {
     logout()
@@ -35,12 +39,12 @@ const Navbar = () => {
           </span>
         </Link>
 
-        {/* Desktop nav links — only show when not logged in */}
-        {!user && (
+        {/* Desktop nav links — only on homepage, only when not logged in */}
+        {isHomePage && !user && (
           <ul className="hidden md:flex items-center gap-1">
             {NAV_LINKS.map(link => (
               <li key={link.label}>
-                
+                <a
                   href={link.href}
                   className="font-body text-sm font-medium text-white/80 hover:text-white px-3 py-1.5 rounded-pill hover:bg-white/10 transition-all duration-200"
                 >
@@ -54,7 +58,6 @@ const Navbar = () => {
         {/* Desktop right side */}
         <div className="hidden md:flex items-center gap-2">
           {user ? (
-            // ── Logged in: show user profile dropdown ──────────────
             <div className="relative">
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
@@ -72,7 +75,6 @@ const Navbar = () => {
                 <ChevronDown size={14} className="text-white/70" />
               </button>
 
-              {/* Dropdown */}
               {profileOpen && (
                 <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-hero border border-cream-300 py-2 z-50">
                   <div className="px-4 py-2 border-b border-cream-200 mb-1">
@@ -95,7 +97,6 @@ const Navbar = () => {
               )}
             </div>
           ) : (
-            // ── Not logged in: show Sign In + Get Started ───────────
             <>
               <Link
                 to="/login"
@@ -124,9 +125,8 @@ const Navbar = () => {
       {mobileOpen && (
         <div className="md:hidden mt-2 nav-gradient rounded-3xl shadow-nav max-w-6xl mx-auto px-6 py-4 flex flex-col gap-1">
 
-          {/* Nav links — only when not logged in */}
-          {!user && NAV_LINKS.map(link => (
-            
+          {isHomePage && !user && NAV_LINKS.map(link => (
+            <a
               key={link.label}
               href={link.href}
               className="font-body text-sm font-medium text-white/80 hover:text-white px-3 py-2.5 rounded-xl hover:bg-white/10 transition-all"
@@ -137,7 +137,6 @@ const Navbar = () => {
           ))}
 
           {user ? (
-            // ── Logged in mobile ────────────────────────────────────
             <div className="border-t border-white/20 mt-2 pt-3">
               <div className="px-3 py-2 mb-2">
                 <p className="font-body text-xs text-white/60 capitalize">{user.role}</p>
@@ -155,7 +154,6 @@ const Navbar = () => {
               </button>
             </div>
           ) : (
-            // ── Not logged in mobile ────────────────────────────────
             <div className="border-t border-white/20 mt-2 pt-2 flex gap-3">
               <Link
                 to="/login"

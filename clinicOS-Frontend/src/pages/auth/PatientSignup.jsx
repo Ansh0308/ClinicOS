@@ -98,7 +98,7 @@ export default function PatientSignup() {
 
   const handleResend = async () => {
     try {
-      await authAPI.sendOTP(formData.email)
+      await authAPI.sendOTP(data.email, true)
       startResendTimer()
       setOtp('')
       setOtpError('')

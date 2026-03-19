@@ -51,7 +51,7 @@ export default function AdminSignup() {
     setLoading(true)
     setApiError('')
     try {
-      await authAPI.sendOTP(data.email)
+      await authAPI.sendOTP(data.email, true)
       setPersonalData(data)
       setStep(2)
       startResendTimer()

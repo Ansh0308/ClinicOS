@@ -41,9 +41,18 @@ const User = sequelize.define('User', {
     type:         DataTypes.BOOLEAN,
     defaultValue: false,
   },
+  // ── Password reset fields (new) ──────────────────────────────
+  resetToken: {
+    type:      DataTypes.STRING(255),
+    allowNull: true,
+  },
+  resetTokenExpiry: {
+    type:      DataTypes.DATE,
+    allowNull: true,
+  },
 }, {
   tableName:  'users',
-  timestamps: true, // adds createdAt and updatedAt automatically
+  timestamps: true,
 })
 
 module.exports = User

@@ -114,9 +114,12 @@ export default function LoginPage() {
             Create account
           </Link>
         </p>
-        <button className="font-body text-sm text-text-muted hover:text-text-body">
-          Forgot password?
-        </button>
+        <Link
+  to="/forgot-password"
+  className="font-body text-sm text-text-muted hover:text-crimson-500 transition-colors"
+>
+  Forgot password?
+</Link>
       </div>
     </SignupLayout>
   )

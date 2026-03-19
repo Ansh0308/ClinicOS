@@ -45,7 +45,7 @@ export default function StaffSignup() {
 
   const onStep1 = async (data) => {
     setLoading(true); setApiError('')
-    try { await authAPI.sendOTP(data.email); setFormData(data); setStep(2); startResendTimer() }
+    try { await authAPI.sendOTP(data.email, true); setFormData(data); setStep(2); startResendTimer() }
     catch (err) { setApiError(err.response?.data?.error || 'Failed to send OTP') }
     finally { setLoading(false) }
   }

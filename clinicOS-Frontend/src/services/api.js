@@ -5,16 +5,12 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Attach JWT to every request automatically
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('clinicos_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
-// If token expires → clear storage and redirect to login
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -27,13 +23,23 @@ api.interceptors.response.use(
   }
 )
 
-// ── Auth endpoints ────────────────────────────────────────────────────────────
 export const authAPI = {
-  sendOTP:   (email)             => api.post('/auth/send-otp',   { email }),
-  verifyOTP: (email, code)       => api.post('/auth/verify-otp', { email, code }),
-  register:  (data)              => api.post('/auth/register',   data),
-  login:     (email, password)   => api.post('/auth/login',      { email, password }),
-  getMe:     ()                  => api.get('/auth/me'),
+  sendOTP:         (email, checkDuplicate = false) =>
+                     api.post('/auth/send-otp', { email, checkDuplicate }),
+  verifyOTP:       (email, code)    => api.post('/auth/verify-otp',      { email, code }),
+  register:        (data)           => api.post('/auth/register',         data),
+  login:           (email, password)=> api.post('/auth/login',            { email, password }),
+  getMe:           ()               => api.get('/auth/me'),
+  forgotPassword:  (email)          => api.post('/auth/forgot-password',  { email }),
+  resetPassword:   (token, password)=> api.post('/auth/reset-password',   { token, password }),
 }
-
+export const adminAPI = {
+  getStats:          ()          => api.get('/admin/stats'),
+  getJoinRequests:   ()          => api.get('/admin/join-requests'),
+  reviewRequest:     (id, action)=> api.patch(`/admin/join-requests/${id}`, { action }),
+  getTeam:           ()          => api.get('/admin/team'),
+  updateMember:      (id, action)=> api.patch(`/admin/team/${id}`, { action }),
+  getClinic:         ()          => api.get('/admin/clinic'),
+  updateClinic:      (data)      => api.patch('/admin/clinic', data),
+}
 export default api
