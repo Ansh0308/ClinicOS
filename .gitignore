@@ -1,5 +1,4 @@
 # Logs
-
 logs/
 *.log
 npm-debug.log*
@@ -9,39 +8,36 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Runtime files
-
 pids
 *.pid
 *.seed
 *.pid.lock
 
 # Dependency directories
-
 node_modules/
+clinicOS-Backend/node_modules/
+clinicOS-Frontend/node_modules/
 
 # Environment variables
-
 .env
 .env.*
 !.env.example
+clinicOS-Backend/.env
+clinicOS-Frontend/.env
 
 # Build output
-
 dist/
 dist-ssr/
 build/
 
 # Local config
-
 *.local
 
 # OS files
-
 .DS_Store
 Thumbs.db
 
 # Editor directories and files
-
 .vscode/*
 !.vscode/extensions.json
 .idea/
@@ -51,15 +47,9 @@ Thumbs.db
 *.sln
 *.sw?
 
-# Optional: logs folder if you create one
-
-logs/
-
 # Optional: coverage reports
-
 coverage/
 
 # Optional: temp files
-
 tmp/
 temp/
