@@ -42,7 +42,6 @@ export const adminAPI = {
   getClinic:         ()          => api.get('/admin/clinic'),
   updateClinic:      (data)      => api.patch('/admin/clinic', data),
 }
-<<<<<<< HEAD
 
 export const patientAPI = {
   lookup: (phone)  => api.post('/patients/lookup', { phone }),
@@ -60,6 +59,4 @@ export const tokenAPI = {
   resume:     ()              => api.patch('/tokens/queue/resume'),
 }
 
-=======
->>>>>>> 37997ae2e6c1a2e778c4d83b697699530c7bad82
 export default api
