@@ -1,0 +1,2513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClinicOS — Design System Document</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+
+/* ─── DESIGN TOKENS ──────────────────────────────────────────────────────── */
+:root {
+  /* Primary palette — extracted from Pomegranate reference */
+  --crimson-100: #FBEAF0;
+  --crimson-200: #F2C5D4;
+  --crimson-300: #E8909B;  /* light accent */
+  --crimson-400: #D95570;  /* nav gradient top */
+  --crimson-500: #C43055;  /* primary brand red */
+  --crimson-600: #A02040;  /* nav gradient mid */
+  --crimson-700: #7A1530;  /* nav gradient dark */
+  --crimson-800: #4E0E20;  /* deepest maroon */
+  --crimson-900: #280710;  /* near-black text */
+
+  /* Neutrals — the warm cream palette */
+  --cream-50:  #FDFAF4;
+  --cream-100: #F5EDD8;    /* page background */
+  --cream-200: #EDE3C8;    /* section alt bg */
+  --cream-300: #E0D4B5;    /* card border / dividers */
+  --cream-400: #C8BB9A;
+
+  /* Accent colors — from app UI cards in screenshots */
+  --accent-yellow: #F0C030;  /* CTA button / highlight */
+  --accent-peach:  #F0A078;  /* activity card header */
+  --accent-teal:   #5AB09A;  /* success / healthy */
+  --accent-lavender: #9080C0; /* secondary accent */
+  --accent-sky:    #70B8D8;  /* compare chart arc */
+
+  /* Semantic */
+  --text-primary:   #1C0910;  /* headlines */
+  --text-secondary: #3C1C28;  /* subheadings */
+  --text-body:      #5C3040;  /* body copy */
+  --text-muted:     #8A6070;  /* captions, labels */
+  --text-on-dark:   #FFFFFF;
+
+  /* UI */
+  --border-light:   rgba(92,48,64,0.15);
+  --border-medium:  rgba(92,48,64,0.3);
+  --shadow-sm:      0 2px 8px rgba(30,9,16,0.08);
+  --shadow-md:      0 6px 24px rgba(30,9,16,0.12);
+  --shadow-lg:      0 16px 48px rgba(30,9,16,0.18);
+  --shadow-card:    0 4px 20px rgba(30,9,16,0.10), 0 1px 4px rgba(30,9,16,0.06);
+
+  /* Radii */
+  --radius-sm:  8px;
+  --radius-md:  16px;
+  --radius-lg:  24px;
+  --radius-xl:  32px;
+  --radius-2xl: 48px;
+  --radius-pill: 100px;
+
+  /* Spacing scale (8px base) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+  --sp-20: 80px;
+  --sp-24: 96px;
+  --sp-32: 128px;
+
+  /* Typography */
+  --font-display: 'Fredoka', system-ui, sans-serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+
+  /* Font sizes */
+  --text-xs:   11px;
+  --text-sm:   13px;
+  --text-base: 16px;
+  --text-md:   18px;
+  --text-lg:   22px;
+  --text-xl:   28px;
+  --text-2xl:  36px;
+  --text-3xl:  48px;
+  --text-4xl:  60px;
+  --text-5xl:  80px;
+}
+
+/* ─── RESET ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  background: var(--cream-50);
+  color: var(--text-primary);
+  line-height: 1.6;
+  font-size: var(--text-base);
+}
+
+/* ─── DOC LAYOUT ─────────────────────────────────────────────────────────── */
+.doc-header {
+  background: linear-gradient(160deg, var(--crimson-500) 0%, var(--crimson-700) 60%, var(--crimson-800) 100%);
+  padding: var(--sp-20) var(--sp-12) var(--sp-16);
+  position: relative;
+  overflow: hidden;
+}
+.doc-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 70% 30%, rgba(255,255,255,0.08) 0%, transparent 60%);
+}
+.doc-header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  position: relative;
+}
+.doc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.9);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-pill);
+  margin-bottom: var(--sp-6);
+}
+.doc-header h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  color: #FFFFFF;
+  line-height: 1.1;
+  margin-bottom: var(--sp-4);
+}
+.doc-header h1 span {
+  color: var(--accent-yellow);
+}
+.doc-header p {
+  font-family: var(--font-body);
+  font-size: var(--text-lg);
+  color: rgba(255,255,255,0.8);
+  max-width: 560px;
+  line-height: 1.5;
+  margin-bottom: var(--sp-8);
+}
+.doc-meta {
+  display: flex;
+  gap: var(--sp-6);
+  flex-wrap: wrap;
+}
+.doc-meta-item {
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: var(--radius-md);
+  padding: var(--sp-3) var(--sp-5);
+}
+.doc-meta-item label {
+  display: block;
+  font-size: var(--text-xs);
+  color: rgba(255,255,255,0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+.doc-meta-item span {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  color: #fff;
+  font-weight: 500;
+}
+
+/* Navigation dots */
+.doc-nav {
+  background: var(--cream-200);
+  border-bottom: 1px solid var(--cream-300);
+  padding: var(--sp-4) var(--sp-12);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.doc-nav-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  gap: var(--sp-6);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.doc-nav a {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-body);
+  text-decoration: none;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-pill);
+  transition: all 0.2s;
+}
+.doc-nav a:hover {
+  background: var(--crimson-500);
+  color: white;
+}
+
+.doc-body {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--sp-16) var(--sp-12);
+}
+
+/* Sections */
+.section {
+  margin-bottom: var(--sp-24);
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-8);
+  padding-bottom: var(--sp-4);
+  border-bottom: 2px solid var(--cream-300);
+}
+.section-number {
+  width: 40px;
+  height: 40px;
+  background: var(--crimson-500);
+  color: white;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.section-title {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.subsection {
+  margin-top: var(--sp-10);
+  margin-bottom: var(--sp-8);
+}
+.subsection-title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--crimson-600);
+  margin-bottom: var(--sp-4);
+}
+
+/* Info callout */
+.callout {
+  background: var(--cream-100);
+  border: 1px solid var(--cream-300);
+  border-left: 4px solid var(--crimson-500);
+  border-radius: var(--radius-md);
+  padding: var(--sp-5) var(--sp-6);
+  margin-bottom: var(--sp-6);
+  font-size: var(--text-base);
+  color: var(--text-body);
+  line-height: 1.6;
+}
+.callout strong { color: var(--text-primary); }
+
+/* ─── 1. COLOR PALETTE ───────────────────────────────────────────────────── */
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-8);
+}
+.swatch-card {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  background: white;
+}
+.swatch-block {
+  height: 100px;
+  position: relative;
+}
+.swatch-block.checkered {
+  background-image: linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
+                    linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
+                    linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
+                    linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+  background-size: 10px 10px;
+  background-position: 0 0, 0 5px, 5px -5px, -5px 0px;
+}
+.swatch-info {
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--cream-300);
+}
+.swatch-name {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  display: block;
+}
+.swatch-hex {
+  font-family: 'Courier New', monospace;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+  display: block;
+  letter-spacing: 0.04em;
+}
+.swatch-use {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  display: block;
+  line-height: 1.4;
+}
+.palette-label {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--sp-4);
+  margin-top: var(--sp-8);
+}
+
+/* Gradient showcase */
+.gradient-showcase {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-8);
+}
+.gradient-card {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+.gradient-block {
+  height: 120px;
+}
+.gradient-info {
+  background: white;
+  padding: var(--sp-4);
+  border-top: 1px solid var(--cream-300);
+}
+.gradient-name {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  display: block;
+}
+.gradient-code {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: block;
+  word-break: break-all;
+}
+
+/* ─── 2. TYPOGRAPHY ─────────────────────────────────────────────────────── */
+.type-scale {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+.type-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  align-items: baseline;
+  gap: var(--sp-6);
+  padding: var(--sp-5);
+  background: var(--cream-100);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--cream-300);
+}
+.type-meta {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.8;
+}
+.type-meta strong { color: var(--text-body); font-size: var(--text-sm); display: block; margin-bottom: 4px; }
+.type-meta code {
+  background: var(--cream-300);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  display: inline-block;
+  margin: 1px;
+}
+
+/* Font comparison */
+.font-demo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-6);
+  margin-bottom: var(--sp-8);
+}
+.font-demo-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: var(--sp-8);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--cream-300);
+}
+.font-demo-card .role {
+  font-size: var(--text-xs);
+  color: var(--crimson-500);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  margin-bottom: var(--sp-3);
+}
+.font-demo-card .specimen {
+  line-height: 1.2;
+  color: var(--text-primary);
+  margin-bottom: var(--sp-4);
+}
+.font-demo-card .chars {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 2;
+  border-top: 1px solid var(--cream-300);
+  padding-top: var(--sp-4);
+}
+
+/* ─── 3. LAYOUT ─────────────────────────────────────────────────────────── */
+.layout-demo {
+  background: var(--cream-200);
+  border-radius: var(--radius-xl);
+  padding: var(--sp-8);
+  margin-bottom: var(--sp-6);
+  border: 1px solid var(--cream-300);
+}
+.layout-browser {
+  background: white;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+.browser-bar {
+  background: var(--cream-200);
+  padding: var(--sp-3) var(--sp-4);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  border-bottom: 1px solid var(--cream-300);
+}
+.browser-dot { width: 10px; height: 10px; border-radius: 50%; }
+.browser-url {
+  flex: 1;
+  background: white;
+  border-radius: var(--radius-pill);
+  padding: 3px 12px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin: 0 var(--sp-3);
+}
+
+/* Nav preview */
+.nav-preview {
+  background: linear-gradient(to bottom, var(--crimson-400) 0%, var(--crimson-600) 60%, var(--crimson-800) 100%);
+  padding: var(--sp-4) var(--sp-8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-preview-btn-outline {
+  border: 1.5px solid rgba(255,255,255,0.8);
+  background: white;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nav-preview-logo {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.15);
+}
+.nav-preview-btn-filled {
+  background: var(--crimson-800);
+  color: white;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: none;
+}
+
+/* Section anatomy */
+.section-anatomy {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-6);
+}
+.anatomy-card {
+  background: white;
+  border: 1px solid var(--cream-300);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.anatomy-header {
+  padding: var(--sp-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--cream-300);
+}
+.anatomy-title { font-weight: 600; font-size: var(--text-sm); color: var(--text-primary); }
+.anatomy-tag {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--cream-200);
+  color: var(--text-muted);
+}
+.anatomy-body { padding: var(--sp-4); font-size: var(--text-sm); color: var(--text-body); line-height: 1.6; }
+.anatomy-body strong { color: var(--text-primary); }
+.anatomy-body code {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  background: var(--cream-200);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--crimson-600);
+}
+
+/* Grid diagram */
+.grid-diagram {
+  background: white;
+  border: 1px solid var(--cream-300);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+  margin-bottom: var(--sp-6);
+}
+.grid-visual {
+  display: grid;
+  grid-template-columns: 220px 1fr 220px;
+  gap: 0;
+  border: 1.5px solid var(--cream-300);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  height: 80px;
+  margin-bottom: var(--sp-4);
+}
+.grid-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.grid-col.margin { background: rgba(240,192,48,0.12); }
+.grid-col.content { background: rgba(196,48,85,0.08); border-left: 1px solid var(--cream-300); border-right: 1px solid var(--cream-300); }
+
+.spec-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.spec-table th {
+  text-align: left;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 2px solid var(--cream-300);
+}
+.spec-table td {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--cream-200);
+  color: var(--text-body);
+  vertical-align: top;
+}
+.spec-table td:first-child { font-weight: 600; color: var(--text-primary); min-width: 160px; }
+.spec-table td code {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  background: var(--cream-200);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--crimson-600);
+  display: inline-block;
+  margin: 2px;
+}
+.spec-table tr:last-child td { border-bottom: none; }
+.spec-table tr:hover td { background: var(--cream-100); }
+
+/* ─── 4. COMPONENTS ─────────────────────────────────────────────────────── */
+.component-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--sp-6);
+  margin-bottom: var(--sp-8);
+}
+.component-card {
+  background: white;
+  border: 1px solid var(--cream-300);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+.component-preview {
+  background: var(--cream-100);
+  padding: var(--sp-8);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  border-bottom: 1px solid var(--cream-300);
+}
+.component-info {
+  padding: var(--sp-5) var(--sp-6);
+}
+.component-info h4 {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--sp-3);
+}
+.component-info table {
+  width: 100%;
+  font-size: 11px;
+  border-collapse: collapse;
+}
+.component-info td {
+  padding: 3px 0;
+  color: var(--text-body);
+  vertical-align: top;
+}
+.component-info td:first-child {
+  color: var(--text-muted);
+  width: 100px;
+  font-weight: 500;
+}
+.component-info td code {
+  font-family: 'Courier New', monospace;
+  background: var(--cream-200);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--crimson-600);
+  font-size: 10px;
+}
+
+/* ACTUAL COMPONENT DEMOS */
+/* Buttons */
+.btn-primary {
+  background: var(--crimson-800);
+  color: white;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  padding: 12px 24px;
+  border-radius: var(--radius-pill);
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 12px rgba(30,9,16,0.25);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(30,9,16,0.3); }
+
+.btn-outline {
+  background: white;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--border-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.15s;
+}
+.btn-outline:hover { border-color: var(--crimson-500); }
+
+.btn-cta {
+  background: var(--accent-yellow);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  padding: 12px 28px;
+  border-radius: var(--radius-pill);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(240,192,48,0.4);
+  transition: transform 0.15s;
+}
+.btn-cta:hover { transform: translateY(-1px); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--crimson-500);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Badges / Pills */
+.badge-label {
+  display: inline-flex;
+  align-items: center;
+  border: 1.5px solid var(--border-medium);
+  color: var(--text-body);
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  padding: 5px 14px;
+  border-radius: var(--radius-pill);
+}
+.badge-dark {
+  background: var(--crimson-800);
+  color: white;
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+}
+.badge-status-success {
+  background: rgba(90,176,154,0.15);
+  color: var(--accent-teal);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(90,176,154,0.3);
+}
+.badge-status-warning {
+  background: rgba(240,160,120,0.15);
+  color: #C86030;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(240,160,120,0.3);
+}
+.badge-tag {
+  background: var(--crimson-100);
+  color: var(--crimson-600);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+}
+
+/* Cards */
+.card-standard {
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: var(--sp-6);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--cream-300);
+  max-width: 240px;
+}
+.card-stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: var(--sp-2);
+}
+.card-stat-value {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+.card-stat-unit {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.card-metric {
+  background: white;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  width: 160px;
+}
+.card-metric-header {
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--crimson-400);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.card-metric-header span { font-size: var(--text-sm); font-weight: 600; color: white; }
+.card-metric-body { padding: var(--sp-4); }
+.card-metric-number { font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--text-primary); line-height: 1; }
+.card-metric-sub { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-top: 2px; }
+
+.card-profile {
+  background: white;
+  border-radius: var(--radius-xl);
+  padding: var(--sp-5);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--cream-300);
+  width: 180px;
+  text-align: center;
+}
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  margin: 0 auto var(--sp-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+}
+.profile-name { font-weight: 600; font-size: var(--text-sm); color: var(--text-primary); margin-bottom: var(--sp-2); }
+.profile-stats { display: flex; justify-content: space-around; margin-bottom: var(--sp-3); }
+.profile-stat { font-size: 10px; color: var(--text-muted); }
+.profile-stat strong { display: block; font-family: var(--font-display); font-size: var(--text-base); color: var(--text-primary); }
+.profile-tags { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.profile-tag { font-size: 10px; background: var(--cream-200); color: var(--text-body); padding: 2px 8px; border-radius: var(--radius-pill); font-weight: 500; }
+
+/* Form elements */
+.form-group { margin-bottom: var(--sp-5); width: 100%; max-width: 320px; }
+.form-label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--sp-2);
+}
+.form-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--cream-300);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  background: white;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+.form-input:focus { border-color: var(--crimson-400); box-shadow: 0 0 0 3px rgba(196,48,85,0.12); }
+.form-input::placeholder { color: var(--text-muted); }
+.form-input.success { border-color: var(--accent-teal); }
+.form-input.error { border-color: #E05030; }
+.form-hint { font-size: var(--text-xs); color: var(--text-muted); margin-top: var(--sp-2); }
+.form-hint.error { color: #C04020; }
+
+.form-select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--cream-300);
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238A6070' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 16px center;
+  appearance: none;
+  outline: none;
+}
+
+.phone-lookup-demo {
+  position: relative;
+  max-width: 320px;
+  width: 100%;
+}
+.phone-lookup-input {
+  width: 100%;
+  padding: 14px 50px 14px 18px;
+  border: 2px solid var(--cream-300);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  background: white;
+  outline: none;
+  box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
+}
+.phone-lookup-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  background: var(--crimson-500);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+}
+.lookup-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--cream-300);
+  overflow: hidden;
+  z-index: 10;
+}
+.lookup-result {
+  padding: var(--sp-3) var(--sp-4);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  cursor: pointer;
+  transition: background 0.1s;
+  border-bottom: 1px solid var(--cream-200);
+}
+.lookup-result:last-child { border-bottom: none; }
+.lookup-result:hover { background: var(--cream-100); }
+.lookup-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+.lookup-name { font-weight: 600; font-size: var(--text-sm); color: var(--text-primary); }
+.lookup-meta { font-size: 11px; color: var(--text-muted); }
+
+/* Token badge */
+.token-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-display);
+}
+.token-number {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+}
+.token-info { }
+.token-status { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+.token-name { font-size: var(--text-sm); font-weight: 600; color: var(--text-primary); }
+
+/* Queue row */
+.queue-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  background: white;
+  border-radius: var(--radius-md);
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--cream-300);
+  margin-bottom: var(--sp-2);
+  box-shadow: var(--shadow-sm);
+  width: 100%;
+}
+.queue-row.active { border-color: var(--crimson-400); background: rgba(196,48,85,0.03); }
+.queue-row-token { font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; color: var(--crimson-500); width: 40px; flex-shrink: 0; }
+.queue-row-name { flex: 1; }
+.queue-row-name strong { display: block; font-weight: 600; font-size: var(--text-sm); color: var(--text-primary); }
+.queue-row-name span { font-size: var(--text-xs); color: var(--text-muted); }
+.queue-row-wait { font-size: var(--text-sm); font-weight: 600; color: var(--text-muted); text-align: right; flex-shrink: 0; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ─── 5. MOOD ────────────────────────────────────────────────────────────── */
+.mood-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-8);
+}
+.mood-card {
+  border-radius: var(--radius-xl);
+  padding: var(--sp-8) var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.mood-icon { font-size: 36px; line-height: 1; }
+.mood-word {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.2;
+}
+.mood-desc { font-size: var(--text-sm); line-height: 1.6; }
+
+/* Design principles */
+.principle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-8);
+}
+.principle-card {
+  background: white;
+  border: 1px solid var(--cream-300);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+  box-shadow: var(--shadow-sm);
+}
+.principle-number {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--cream-300);
+  line-height: 1;
+  margin-bottom: var(--sp-3);
+}
+.principle-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--sp-2);
+}
+.principle-desc { font-size: var(--text-sm); color: var(--text-body); line-height: 1.7; }
+
+/* ─── 6. SPACING ─────────────────────────────────────────────────────────── */
+.spacing-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-8);
+}
+.spacing-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+}
+.spacing-name {
+  font-family: 'Courier New', monospace;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-weight: 600;
+  width: 80px;
+  flex-shrink: 0;
+}
+.spacing-bar-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+}
+.spacing-bar {
+  height: 24px;
+  background: var(--crimson-400);
+  border-radius: 4px;
+  opacity: 0.7;
+}
+.spacing-value {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  width: 35px;
+  flex-shrink: 0;
+}
+
+.radius-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-8);
+}
+.radius-item { text-align: center; }
+.radius-box {
+  width: 80px;
+  height: 80px;
+  background: var(--cream-200);
+  border: 2px solid var(--cream-300);
+  margin: 0 auto var(--sp-2);
+}
+.radius-label { font-size: 11px; color: var(--text-muted); }
+.radius-val { font-family: 'Courier New', monospace; font-size: 11px; color: var(--crimson-600); }
+
+/* Layer effect demo */
+.layer-demo {
+  position: relative;
+  height: 200px;
+  margin: var(--sp-6) 0;
+}
+.layer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: var(--radius-2xl);
+  height: 140px;
+}
+.layer-1 { top: 0; background: var(--crimson-400); z-index: 1; }
+.layer-2 { top: 20px; background: var(--crimson-600); z-index: 0; border-radius: 0 0 var(--radius-2xl) var(--radius-2xl); }
+.layer-3 { top: 35px; background: var(--crimson-800); z-index: -1; border-radius: 0 0 var(--radius-2xl) var(--radius-2xl); }
+
+/* Do/Don't */
+.do-dont {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-8);
+}
+.do-card, .dont-card {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 2px solid;
+}
+.do-card { border-color: var(--accent-teal); }
+.dont-card { border-color: #E05030; }
+.do-header, .dont-header {
+  padding: var(--sp-3) var(--sp-5);
+  font-weight: 700;
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.do-header { background: rgba(90,176,154,0.15); color: #2A7060; }
+.dont-header { background: rgba(224,80,48,0.1); color: #A03020; }
+.do-body, .dont-body { padding: var(--sp-4) var(--sp-5); font-size: var(--text-sm); color: var(--text-body); line-height: 1.7; background: white; }
+
+/* CSS variable export */
+.code-block {
+  background: #1E0910;
+  border-radius: var(--radius-lg);
+  padding: var(--sp-6);
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #F0D8E0;
+  overflow-x: auto;
+  margin-bottom: var(--sp-6);
+}
+.code-comment { color: #7A5060; }
+.code-var { color: var(--accent-yellow); }
+.code-value { color: #90D8B8; }
+.code-section { color: #D090A8; font-weight: 600; }
+
+/* Footer */
+.doc-footer {
+  background: var(--crimson-800);
+  padding: var(--sp-10) var(--sp-12);
+  text-align: center;
+  color: rgba(255,255,255,0.7);
+  font-size: var(--text-sm);
+}
+.doc-footer strong { color: white; font-family: var(--font-display); font-size: var(--text-lg); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .doc-header { padding: var(--sp-12) var(--sp-6) var(--sp-10); }
+  .doc-header h1 { font-size: var(--text-3xl); }
+  .doc-body { padding: var(--sp-10) var(--sp-6); }
+  .doc-nav { padding: var(--sp-3) var(--sp-6); }
+  .font-demo-grid, .section-anatomy, .mood-board, .principle-grid, .do-dont { grid-template-columns: 1fr; }
+  .grid-visual { grid-template-columns: 80px 1fr 80px; }
+  .type-row { grid-template-columns: 1fr; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════════════════════ -->
+<header class="doc-header">
+  <div class="doc-header-inner">
+    <div class="doc-badge">🏥 Design System v1.0</div>
+    <h1>ClinicOS <span>Design</span><br>Document</h1>
+    <p>A comprehensive visual specification for developers and designers, derived from the Pomegranate Health reference aesthetic — adapted for a clinic management platform.</p>
+    <div class="doc-meta">
+      <div class="doc-meta-item">
+        <label>Reference Site</label>
+        <span>Pomegranate Health</span>
+      </div>
+      <div class="doc-meta-item">
+        <label>Primary Font</label>
+        <span>Fredoka</span>
+      </div>
+      <div class="doc-meta-item">
+        <label>Body Font</label>
+        <span>DM Sans</span>
+      </div>
+      <div class="doc-meta-item">
+        <label>Base Grid</label>
+        <span>8px</span>
+      </div>
+      <div class="doc-meta-item">
+        <label>Border Radius</label>
+        <span>Heavily rounded</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ NAV ═══════════════════════════════════════════════════════════════════ -->
+<nav class="doc-nav">
+  <div class="doc-nav-inner">
+    <a href="#colors">1. Colors</a>
+    <a href="#typography">2. Typography</a>
+    <a href="#layout">3. Layout</a>
+    <a href="#components">4. Components</a>
+    <a href="#mood">5. Visual Mood</a>
+    <a href="#spacing">6. Spacing</a>
+    <a href="#clinicos">7. ClinicOS Specifics</a>
+    <a href="#code">8. CSS Variables</a>
+  </div>
+</nav>
+
+<!-- ═══ BODY ══════════════════════════════════════════════════════════════════ -->
+<main class="doc-body">
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<!-- SECTION 1: COLORS -->
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<section class="section" id="colors">
+  <div class="section-header">
+    <div class="section-number">1</div>
+    <h2 class="section-title">Color Palette</h2>
+  </div>
+
+  <div class="callout">
+    <strong>Extraction method:</strong> Colors were sampled directly from the Pomegranate Health reference screenshots using visual analysis of the navigation gradient, background surfaces, interactive elements, and data visualization components. The palette is warm-toned, dominated by a rich crimson-to-maroon range, grounded by a distinctive cream background.
+  </div>
+
+  <!-- Primary Crimson Scale -->
+  <div class="palette-label">Primary — Crimson Scale</div>
+  <div class="palette-grid">
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#FBEAF0;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Crimson 100</span>
+        <span class="swatch-hex">#FBEAF0</span>
+        <span class="swatch-use">Hover states, tinted backgrounds</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#F2C5D4;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Crimson 200</span>
+        <span class="swatch-hex">#F2C5D4</span>
+        <span class="swatch-use">Borders on light bg, dividers</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#E89098;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Crimson 300</span>
+        <span class="swatch-hex">#E89098</span>
+        <span class="swatch-use">Icons, decorative accents</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#D95570;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Crimson 400</span>
+        <span class="swatch-hex">#D95570</span>
+        <span class="swatch-use">Nav gradient top, card headers</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#C43055;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Crimson 500 ★</span>
+        <span class="swatch-hex">#C43055</span>
+        <span class="swatch-use">PRIMARY BRAND — links, focus rings, highlights</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#A02040;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Crimson 600</span>
+        <span class="swatch-hex">#A02040</span>
+        <span class="swatch-use">Nav gradient middle, hover on primary</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#7A1530;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Crimson 700</span>
+        <span class="swatch-hex">#7A1530</span>
+        <span class="swatch-use">Nav gradient dark band</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#4E0E20;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Crimson 800 ★</span>
+        <span class="swatch-hex">#4E0E20</span>
+        <span class="swatch-use">Primary CTA button, dark nav band</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#1C0910;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Crimson 900</span>
+        <span class="swatch-hex">#1C0910</span>
+        <span class="swatch-use">Primary headline text</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cream / Neutral Scale -->
+  <div class="palette-label">Neutrals — Warm Cream Scale</div>
+  <div class="palette-grid">
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#FDFAF4;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Cream 50</span>
+        <span class="swatch-hex">#FDFAF4</span>
+        <span class="swatch-use">Document/page background (global)</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#F5EDD8;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Cream 100 ★</span>
+        <span class="swatch-hex">#F5EDD8</span>
+        <span class="swatch-use">Primary section backgrounds</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#EDE3C8;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Cream 200</span>
+        <span class="swatch-hex">#EDE3C8</span>
+        <span class="swatch-use">Alt section, nav background</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#E0D4B5;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Cream 300</span>
+        <span class="swatch-hex">#E0D4B5</span>
+        <span class="swatch-use">Card borders, dividers</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#C8BB9A;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Cream 400</span>
+        <span class="swatch-hex">#C8BB9A</span>
+        <span class="swatch-use">Disabled state borders</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Text Colors -->
+  <div class="palette-label">Text Colors</div>
+  <div class="palette-grid">
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#1C0910;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Text Primary</span>
+        <span class="swatch-hex">#1C0910</span>
+        <span class="swatch-use">All headlines, high-emphasis</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#3C1C28;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Text Secondary</span>
+        <span class="swatch-hex">#3C1C28</span>
+        <span class="swatch-use">Subheadings, section labels</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#5C3040;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Text Body</span>
+        <span class="swatch-hex">#5C3040</span>
+        <span class="swatch-use">All body copy, paragraphs</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#8A6070;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Text Muted</span>
+        <span class="swatch-hex">#8A6070</span>
+        <span class="swatch-use">Captions, labels, placeholders</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accent Colors -->
+  <div class="palette-label">Accent Colors — from App UI Cards</div>
+  <div class="palette-grid">
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#F0C030;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Yellow ★</span>
+        <span class="swatch-hex">#F0C030</span>
+        <span class="swatch-use">Primary CTA button, highlights</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#F0A078;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Peach</span>
+        <span class="swatch-hex">#F0A078</span>
+        <span class="swatch-use">Activity/warning card headers</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#5AB09A;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Teal</span>
+        <span class="swatch-hex">#5AB09A</span>
+        <span class="swatch-use">Success, healthy status, positive</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#9080C0;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Lavender</span>
+        <span class="swatch-hex">#9080C0</span>
+        <span class="swatch-use">Secondary charts, zone markers</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#70B8D8;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Sky</span>
+        <span class="swatch-hex">#70B8D8</span>
+        <span class="swatch-use">Info state, chart arc color</span>
+      </div>
+    </div>
+    <div class="swatch-card">
+      <div class="swatch-block" style="background:#E85060;"></div>
+      <div class="swatch-info">
+        <span class="swatch-name">Coral Red</span>
+        <span class="swatch-hex">#E85060</span>
+        <span class="swatch-use">Error states, urgent alerts</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gradients -->
+  <div class="subsection">
+    <h3 class="subsection-title">Gradients</h3>
+    <div class="gradient-showcase">
+      <div class="gradient-card">
+        <div class="gradient-block" style="background: linear-gradient(160deg, #D95570 0%, #A02040 55%, #4E0E20 100%);"></div>
+        <div class="gradient-info">
+          <span class="gradient-name">Nav / Header Gradient ★</span>
+          <span class="gradient-code">linear-gradient(160deg, #D95570 0%, #A02040 55%, #4E0E20 100%)</span>
+        </div>
+      </div>
+      <div class="gradient-card">
+        <div class="gradient-block" style="background: linear-gradient(180deg, #C43055 0%, #8C1A32 100%);"></div>
+        <div class="gradient-info">
+          <span class="gradient-name">Footer / Hero Dark</span>
+          <span class="gradient-code">linear-gradient(180deg, #C43055 0%, #8C1A32 100%)</span>
+        </div>
+      </div>
+      <div class="gradient-card">
+        <div class="gradient-block" style="background: linear-gradient(135deg, #F5EDD8 0%, #EDE3C8 100%);"></div>
+        <div class="gradient-info">
+          <span class="gradient-name">Cream Section Background</span>
+          <span class="gradient-code">linear-gradient(135deg, #F5EDD8 0%, #EDE3C8 100%)</span>
+        </div>
+      </div>
+      <div class="gradient-card">
+        <div class="gradient-block" style="background: radial-gradient(ellipse at 60% 40%, rgba(240,192,48,0.3) 0%, rgba(196,48,85,0.15) 50%, transparent 80%), #F5EDD8;"></div>
+        <div class="gradient-info">
+          <span class="gradient-name">Hero Content Glow</span>
+          <span class="gradient-code">radial-gradient(ellipse at 60% 40%, rgba(240,192,48,0.3) 0%, rgba(196,48,85,0.15) 50%, transparent 80%), #F5EDD8</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<!-- SECTION 2: TYPOGRAPHY -->
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<section class="section" id="typography">
+  <div class="section-header">
+    <div class="section-number">2</div>
+    <h2 class="section-title">Typography</h2>
+  </div>
+
+  <div class="callout">
+    <strong>Font pairing rationale:</strong> The reference site uses a distinctive chunky, rounded display font for all branding and headlines — visually identified as very close to <strong>Fredoka</strong> (rounded, bold, approachable). Body copy uses a clean, highly legible sans-serif, closest match being <strong>DM Sans</strong>. This pairing creates the signature "friendly but professional" tension the brand needs.
+  </div>
+
+  <!-- Font demos -->
+  <div class="font-demo-grid">
+    <div class="font-demo-card">
+      <div class="role">Display / Headings — Fredoka</div>
+      <div class="specimen" style="font-family: 'Fredoka', sans-serif; font-size: 48px; font-weight: 700; color: var(--text-primary);">
+        ClinicOS
+      </div>
+      <div class="specimen" style="font-family: 'Fredoka', sans-serif; font-size: 28px; font-weight: 600; color: var(--text-secondary);">
+        Smart Queue Management
+      </div>
+      <div class="specimen" style="font-family: 'Fredoka', sans-serif; font-size: 20px; font-weight: 500; color: var(--text-body);">
+        Finally, really intelligent clinic software
+      </div>
+      <div class="chars" style="font-family: 'Fredoka', sans-serif;">
+        A B C D E F G H I J K L M N O P Q R S T U V W X Y Z<br>
+        a b c d e f g h i j k l m n o p q r s t u v w x y z<br>
+        0 1 2 3 4 5 6 7 8 9 ! @ # ₹ & * ( ) +
+      </div>
+    </div>
+    <div class="font-demo-card">
+      <div class="role">Body / UI — DM Sans</div>
+      <div class="specimen" style="font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 400; color: var(--text-body); line-height: 1.7; margin-bottom: 16px;">
+        Subscription-based clinic management by the Really Intelligent Health people, because paper tokens are out of touch, out of date, and out of time.
+      </div>
+      <div class="specimen" style="font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.08em;">
+        PATIENT REGISTERED · TOKEN #23 · 35 MIN WAIT
+      </div>
+      <div class="chars" style="font-family: 'DM Sans', sans-serif;">
+        A B C D E F G H I J K L M N O P Q R S T U V W X Y Z<br>
+        a b c d e f g h i j k l m n o p q r s t u v w x y z<br>
+        0 1 2 3 4 5 6 7 8 9 ! @ # ₹ & * ( ) +
+      </div>
+    </div>
+  </div>
+
+  <!-- Type scale -->
+  <div class="subsection">
+    <h3 class="subsection-title">Type Scale</h3>
+    <div class="type-scale">
+      <div class="type-row">
+        <div class="type-meta">
+          <strong>Display / Logo</strong>
+          <code>Fredoka</code> <code>80px</code> <code>700</code>
+          <div>Use: logo, hero display</div>
+        </div>
+        <div style="font-family:'Fredoka',sans-serif; font-size:80px; font-weight:700; color:var(--text-primary); line-height:1; overflow:hidden;">ClinicOS</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">
+          <strong>H1 — Page Headline</strong>
+          <code>Fredoka</code> <code>60px</code> <code>700</code>
+          <div>Use: landing page hero, section hero</div>
+        </div>
+        <div style="font-family:'Fredoka',sans-serif; font-size:60px; font-weight:700; color:var(--text-primary); line-height:1.05;">Finally, Smart Clinics</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">
+          <strong>H2 — Section Title</strong>
+          <code>Fredoka</code> <code>48px</code> <code>700</code>
+          <div>Use: feature sections, major headings</div>
+        </div>
+        <div style="font-family:'Fredoka',sans-serif; font-size:48px; font-weight:700; color:var(--text-primary); line-height:1.1;">Intelligent Healthcare</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">
+          <strong>H3 — Card Title</strong>
+          <code>Fredoka</code> <code>36px</code> <code>600</code>
+          <div>Use: card headers, sub-sections</div>
+        </div>
+        <div style="font-family:'Fredoka',sans-serif; font-size:36px; font-weight:600; color:var(--text-primary);">Queue Management</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">
+          <strong>H4 — Component Title</strong>
+          <code>Fredoka</code> <code>28px</code> <code>600</code>
+          <div>Use: dashboard panels, widget titles</div>
+        </div>
+        <div style="font-family:'Fredoka',sans-serif; font-size:28px; font-weight:600; color:var(--text-primary);">Today's Patients</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">
+          <strong>Body Large</strong>
+          <code>DM Sans</code> <code>18px</code> <code>400</code>
+          <div>Use: hero subtitles, intros</div>
+        </div>
+        <div style="font-family:'DM Sans',sans-serif; font-size:18px; color:var(--text-body); line-height:1.6;">The smart clinic system that replaces paper tokens, manual queues, and missed appointments with intelligent automation.</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">
+          <strong>Body Default</strong>
+          <code>DM Sans</code> <code>16px</code> <code>400</code>
+          <div>Use: all body copy, descriptions</div>
+        </div>
+        <div style="font-family:'DM Sans',sans-serif; font-size:16px; color:var(--text-body); line-height:1.6;">Patient lookup returns results in under 500ms. Staff can register a new patient in under 30 seconds. Bills are generated as branded PDFs and sent via WhatsApp automatically.</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">
+          <strong>UI / Label</strong>
+          <code>DM Sans</code> <code>13px</code> <code>600</code> <code>UPPERCASE</code>
+          <div>Use: badges, status labels, nav links</div>
+        </div>
+        <div style="font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-muted);">SUBSCRIPTIONS, NOT PREMIUMS · TOKEN ISSUED · WAITING</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta">
+          <strong>Caption / Micro</strong>
+          <code>DM Sans</code> <code>11px</code> <code>500</code>
+          <div>Use: timestamps, metadata, hints</div>
+        </div>
+        <div style="font-family:'DM Sans',sans-serif; font-size:11px; font-weight:500; color:var(--text-muted); letter-spacing:0.04em;">Last visit: Jan 15, 2025 · Dr. Sharma · 3 previous visits</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rules -->
+  <div class="subsection">
+    <h3 class="subsection-title">Typography Rules</h3>
+    <table class="spec-table">
+      <thead><tr><th>Property</th><th>Rule</th><th>Rationale</th></tr></thead>
+      <tbody>
+        <tr><td>Line Height — Body</td><td><code>1.6 – 1.7</code></td><td>Generous leading for medical/dense content readability</td></tr>
+        <tr><td>Line Height — Display</td><td><code>1.0 – 1.15</code></td><td>Tight for impact; Fredoka's rounded forms need less leading</td></tr>
+        <tr><td>Letter Spacing — Labels</td><td><code>0.06em – 0.1em</code></td><td>All-caps UI labels need tracking to improve legibility</td></tr>
+        <tr><td>Letter Spacing — Headlines</td><td><code>-0.01em to 0</code></td><td>Fredoka naturally spaced; slight tightening at large sizes</td></tr>
+        <tr><td>Max Line Length</td><td><code>60 – 70 characters</code></td><td>Optimal reading measure for body paragraphs</td></tr>
+        <tr><td>Font Smoothing</td><td><code>-webkit-font-smoothing: antialiased</code></td><td>Renders Fredoka's thick strokes smoothly on retina displays</td></tr>
+        <tr><td>Numeric Rendering</td><td><code>font-variant-numeric: tabular-nums</code></td><td>Required for all dashboard stat numbers to align correctly</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<!-- SECTION 3: LAYOUT -->
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<section class="section" id="layout">
+  <div class="section-header">
+    <div class="section-number">3</div>
+    <h2 class="section-title">Layout Structure & Grid System</h2>
+  </div>
+
+  <!-- Nav preview -->
+  <div class="subsection">
+    <h3 class="subsection-title">Navigation — Signature Layered Header</h3>
+    <div class="callout">
+      The most distinctive layout element of the reference site is the <strong>multi-layer header effect</strong> — the navigation appears as a rounded card sitting on top of two progressively darker, slightly offset bands. This creates a sense of physical depth, as if the nav is a card floating above the page. This must be faithfully replicated for ClinicOS.
+    </div>
+    <div class="layout-demo">
+      <div class="layout-browser">
+        <div class="browser-bar">
+          <div class="browser-dot" style="background:#E05030;"></div>
+          <div class="browser-dot" style="background:#F0C030;"></div>
+          <div class="browser-dot" style="background:#5AB09A;"></div>
+          <div class="browser-url">clinicos.app</div>
+        </div>
+        <!-- Layered nav effect -->
+        <div style="position:relative; padding-top: 8px;">
+          <!-- Layer 3 (darkest) -->
+          <div style="background:var(--crimson-800); height:16px; border-radius: 32px 32px 0 0; position:absolute; top:20px; left:0; right:0; z-index:0;"></div>
+          <!-- Layer 2 -->
+          <div style="background:var(--crimson-600); height:16px; border-radius: 32px 32px 0 0; position:absolute; top:10px; left:0; right:0; z-index:1;"></div>
+          <!-- Layer 1 (nav itself) -->
+          <div class="nav-preview" style="position:relative; z-index:2; border-radius: 28px 28px 0 0;">
+            <div class="nav-preview-btn-outline">☰ Learn More</div>
+            <div class="nav-preview-logo">clinicos</div>
+            <div class="nav-preview-btn-filled">Join Waiting List</div>
+          </div>
+        </div>
+        <!-- Content area below -->
+        <div style="background:var(--cream-100); padding: 40px 60px 50px; text-align:center;">
+          <div style="display:inline-block; background:var(--crimson-800); color:white; font-size:12px; padding:6px 16px; border-radius:100px; margin-bottom:16px; font-family:var(--font-body);">Introducing ClinicOS</div>
+          <div style="font-family:var(--font-display); font-size:36px; font-weight:700; color:var(--text-primary); line-height:1.15; margin-bottom:12px;">Finally, Really<br>Intelligent Healthcare</div>
+          <div style="font-family:var(--font-body); font-size:15px; color:var(--text-body); max-width:420px; margin:0 auto;">Subscription-based clinic management, because paper tokens are out of touch, out of date, and out of time.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grid -->
+  <div class="subsection">
+    <h3 class="subsection-title">Grid System</h3>
+    <div class="grid-diagram">
+      <div class="grid-visual">
+        <div class="grid-col margin">← margin →</div>
+        <div class="grid-col content">Content Area (max 1100px)</div>
+        <div class="grid-col margin">← margin →</div>
+      </div>
+      <table class="spec-table">
+        <thead><tr><th>Breakpoint</th><th>Max Width</th><th>Gutter</th><th>Margins</th><th>Columns</th></tr></thead>
+        <tbody>
+          <tr><td>Mobile</td><td><code>100%</code></td><td><code>16px</code></td><td><code>20px</code></td><td>4</td></tr>
+          <tr><td>Tablet</td><td><code>768px</code></td><td><code>24px</code></td><td><code>40px</code></td><td>8</td></tr>
+          <tr><td>Desktop</td><td><code>1100px</code></td><td><code>32px</code></td><td><code>auto</code></td><td>12</td></tr>
+          <tr><td>Wide</td><td><code>1280px</code></td><td><code>32px</code></td><td><code>auto</code></td><td>12</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section anatomy -->
+  <div class="subsection">
+    <h3 class="subsection-title">Page Section Anatomy</h3>
+    <div class="section-anatomy">
+      <div class="anatomy-card">
+        <div class="anatomy-header">
+          <span class="anatomy-title">Section Label</span>
+          <span class="anatomy-tag">Pill badge</span>
+        </div>
+        <div class="anatomy-body">
+          A small outlined pill above every major section heading. Contains 2–4 words. Style: <code>border: 1.5px solid</code>, <code>border-radius: 100px</code>, <code>font-size: 13px</code>, <code>padding: 5px 14px</code>.<br><br>
+          <strong>Example:</strong> "Subscriptions, not premiums" / "By the Really Intelligent people"
+        </div>
+      </div>
+      <div class="anatomy-card">
+        <div class="anatomy-header">
+          <span class="anatomy-title">Section Heading</span>
+          <span class="anatomy-tag">H2 / H3</span>
+        </div>
+        <div class="anatomy-body">
+          Always <code>Fredoka</code> bold. Two-line headlines preferred for impact. Max width: <code>640px</code>. Colour: <code>#1C0910</code> on cream background; <code>#FFFFFF</code> on dark/crimson background.
+        </div>
+      </div>
+      <div class="anatomy-card">
+        <div class="anatomy-header">
+          <span class="anatomy-title">Section Body</span>
+          <span class="anatomy-tag">DM Sans</span>
+        </div>
+        <div class="anatomy-body">
+          <code>DM Sans</code> 16–18px regular. Max width: <code>560px</code>. Colour: <code>#5C3040</code>. Line height: <code>1.65</code>. Sections alternate: text-left + visual-right, then visual-left + text-right (zigzag layout).
+        </div>
+      </div>
+    </div>
+
+    <table class="spec-table">
+      <thead><tr><th>Section Type</th><th>Vertical Padding</th><th>Background</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Public / Hero</td><td><code>120px top, 80px bottom</code></td><td>Cream <code>#F5EDD8</code></td><td>Full-width; phones/screenshots centered</td></tr>
+        <tr><td>Feature (light)</td><td><code>80px top/bottom</code></td><td>Cream <code>#F5EDD8</code></td><td>Text + visual, alternating sides</td></tr>
+        <tr><td>Feature (dark)</td><td><code>80px top/bottom</code></td><td>Crimson gradient</td><td>White text; rounded corners top only</td></tr>
+        <tr><td>Stats / Data</td><td><code>64px top/bottom</code></td><td>White or <code>#FDFAF4</code></td><td>Dense card grid; max 4 cols</td></tr>
+        <tr><td>CTA / Footer</td><td><code>64px top/bottom</code></td><td>Crimson <code>#C43055</code></td><td>Centered; yellow CTA button</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<!-- SECTION 4: COMPONENTS -->
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<section class="section" id="components">
+  <div class="section-header">
+    <div class="section-number">4</div>
+    <h2 class="section-title">Component Styles</h2>
+  </div>
+
+  <div class="component-grid">
+
+    <!-- BUTTONS -->
+    <div class="component-card">
+      <div class="component-preview">
+        <button class="btn-primary">Join Waiting List</button>
+        <button class="btn-outline">☰ Learn More</button>
+        <button class="btn-cta">Join the Waiting List</button>
+        <button class="btn-ghost">View all patients</button>
+      </div>
+      <div class="component-info">
+        <h4>Buttons</h4>
+        <table>
+          <tr><td>Primary</td><td>bg <code>#4E0E20</code>, white text, <code>border-radius: 100px</code>, <code>padding: 12px 24px</code>, bold uppercase</td></tr>
+          <tr><td>Outline</td><td>white bg, <code>border: 2px solid rgba(92,48,64,0.3)</code>, dark text, same radius</td></tr>
+          <tr><td>CTA Yellow</td><td>bg <code>#F0C030</code>, dark text, strong shadow, used on dark backgrounds</td></tr>
+          <tr><td>Ghost</td><td>Transparent, brand text color, underline only, no border</td></tr>
+          <tr><td>Hover</td><td><code>translateY(-1px)</code> + stronger shadow on primary/CTA</td></tr>
+          <tr><td>Font</td><td>DM Sans 13px, weight 700, uppercase, 0.04em tracking</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- BADGE / PILLS -->
+    <div class="component-card">
+      <div class="component-preview" style="flex-wrap:wrap; gap:8px;">
+        <span class="badge-label">Subscriptions, not premiums</span>
+        <span class="badge-dark">Introducing ClinicOS</span>
+        <span class="badge-status-success">● Available</span>
+        <span class="badge-status-warning">⚠ On Break</span>
+        <span class="badge-tag">Fitness Enthusiast</span>
+        <span class="badge-tag">High Blood Pressure</span>
+      </div>
+      <div class="component-info">
+        <h4>Badges & Labels</h4>
+        <table>
+          <tr><td>Section Label</td><td>Outline pill, <code>border: 1.5px solid rgba(92,48,64,0.3)</code>, 13px DM Sans, <code>padding: 5px 14px</code></td></tr>
+          <tr><td>Intro Badge</td><td>Dark bg <code>#4E0E20</code>, white 12px DM Sans, pill shape</td></tr>
+          <tr><td>Status Success</td><td>Teal tint bg, teal text, pill, <code>border: 1px solid</code></td></tr>
+          <tr><td>Status Warning</td><td>Peach tint bg, dark orange text</td></tr>
+          <tr><td>Tag / Category</td><td>Light crimson bg, crimson text — used for patient traits</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- STAT CARD -->
+    <div class="component-card">
+      <div class="component-preview">
+        <div class="card-standard">
+          <div class="card-stat-label">Patients Today</div>
+          <div style="margin-bottom:4px;">
+            <span class="card-stat-value">47</span>
+          </div>
+          <div style="font-size:12px; color:var(--accent-teal); font-weight:600;">↑ 12% vs yesterday</div>
+        </div>
+      </div>
+      <div class="component-info">
+        <h4>Stat Card</h4>
+        <table>
+          <tr><td>Background</td><td>white</td></tr>
+          <tr><td>Border</td><td><code>1px solid #E0D4B5</code></td></tr>
+          <tr><td>Border Radius</td><td><code>24px</code></td></tr>
+          <tr><td>Padding</td><td><code>24px</code></td></tr>
+          <tr><td>Shadow</td><td><code>0 4px 20px rgba(30,9,16,0.10)</code></td></tr>
+          <tr><td>Stat number</td><td>Fredoka 700, 36–48px, <code>#1C0910</code></td></tr>
+          <tr><td>Stat label</td><td>DM Sans 11px uppercase 0.06em tracking, <code>#8A6070</code></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- METRIC CARD WITH COLORED HEADER -->
+    <div class="component-card">
+      <div class="component-preview" style="gap:12px;">
+        <div class="card-metric">
+          <div class="card-metric-header" style="background:#D95570;">
+            <span>Heart Rate</span>
+          </div>
+          <div class="card-metric-body">
+            <div class="card-metric-number">206</div>
+            <div class="card-metric-sub">Max Rate</div>
+          </div>
+        </div>
+        <div class="card-metric">
+          <div class="card-metric-header" style="background:#F0A078;">
+            <span>Avg Wait</span>
+          </div>
+          <div class="card-metric-body">
+            <div class="card-metric-number">35</div>
+            <div class="card-metric-sub">Minutes</div>
+          </div>
+        </div>
+        <div class="card-metric">
+          <div class="card-metric-header" style="background:#9080C0;">
+            <span>Revenue</span>
+          </div>
+          <div class="card-metric-body">
+            <div class="card-metric-number">₹12K</div>
+            <div class="card-metric-sub">Today</div>
+          </div>
+        </div>
+      </div>
+      <div class="component-info">
+        <h4>Metric Card (with colored header)</h4>
+        <table>
+          <tr><td>Header</td><td>Colored (brand accent), <code>padding: 12px 16px</code>, icon + label in white</td></tr>
+          <tr><td>Body</td><td>White bg, <code>padding: 16px</code></td></tr>
+          <tr><td>Border Radius</td><td><code>16px</code> (smaller than stat card)</td></tr>
+          <tr><td>Number</td><td>Fredoka 700, 32px, dark text</td></tr>
+          <tr><td>Width</td><td>Fixed ~160px; used in grid of 3–4</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- PROFILE CARD -->
+    <div class="component-card">
+      <div class="component-preview">
+        <div class="card-profile">
+          <div class="avatar" style="background: linear-gradient(135deg, #70B8D8, #5AB09A);">SR</div>
+          <div class="profile-name">Stephen Raleigh</div>
+          <div class="profile-stats">
+            <div class="profile-stat"><strong>38</strong>Age</div>
+            <div class="profile-stat"><strong>184</strong>Height</div>
+            <div class="profile-stat"><strong>70</strong>Weight</div>
+          </div>
+          <div class="profile-tags">
+            <span class="profile-tag">Fitness Enthusiast</span>
+            <span class="profile-tag">High BP</span>
+          </div>
+        </div>
+      </div>
+      <div class="component-info">
+        <h4>Profile / Patient Card</h4>
+        <table>
+          <tr><td>Shape</td><td>Rounded <code>24px</code>, white bg, subtle shadow</td></tr>
+          <tr><td>Avatar</td><td>56px circle, gradient bg, initials in Fredoka 700</td></tr>
+          <tr><td>Stats row</td><td>Flex, spaced evenly; label below value</td></tr>
+          <tr><td>Tags</td><td>Pill tags, <code>#F5EDD8</code> bg, dark text, 10px</td></tr>
+          <tr><td>Width</td><td>~180px fixed; centered content</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- FORMS -->
+    <div class="component-card">
+      <div class="component-preview" style="flex-direction:column; align-items:flex-start; padding: 24px 32px;">
+        <div class="form-group" style="margin-bottom:16px;">
+          <label class="form-label">Patient Name</label>
+          <input class="form-input" type="text" placeholder="Enter patient name" value="Rajesh Kumar">
+          <span class="form-hint">Auto-filled from phone lookup</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          <div class="phone-lookup-demo">
+            <input class="phone-lookup-input" type="tel" placeholder="+91 98765 43210" value="+91 98765 43210">
+            <div class="phone-lookup-icon">→</div>
+          </div>
+        </div>
+      </div>
+      <div class="component-info">
+        <h4>Form Fields</h4>
+        <table>
+          <tr><td>Input border</td><td><code>2px solid #E0D4B5</code></td></tr>
+          <tr><td>Input radius</td><td><code>12px</code> (rectangular) or <code>100px</code> (pill — phone lookup)</td></tr>
+          <tr><td>Padding</td><td><code>12px 16px</code></td></tr>
+          <tr><td>Focus ring</td><td><code>border: 2px solid #D95570</code> + <code>box-shadow: 0 0 0 3px rgba(196,48,85,0.12)</code></td></tr>
+          <tr><td>Label</td><td>DM Sans 14px 600, <code>#3C1C28</code>, margin-bottom 8px</td></tr>
+          <tr><td>Placeholder</td><td>DM Sans, <code>#8A6070</code></td></tr>
+          <tr><td>Error</td><td>Border <code>#E05030</code>; hint text in coral</td></tr>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Queue-specific components -->
+  <div class="subsection">
+    <h3 class="subsection-title">ClinicOS-specific Components</h3>
+    <div class="component-grid">
+
+      <!-- Queue row -->
+      <div class="component-card">
+        <div class="component-preview" style="flex-direction:column; align-items:stretch; padding:16px;">
+          <div class="queue-row active">
+            <div class="queue-row-token">#1</div>
+            <div style="width:8px; height:8px; border-radius:50%; background:var(--crimson-500); flex-shrink:0;"></div>
+            <div class="queue-row-name">
+              <strong>Rajesh Kumar</strong>
+              <span>Walk-in · Cardiology</span>
+            </div>
+            <div class="queue-row-wait">With Dr.</div>
+          </div>
+          <div class="queue-row">
+            <div class="queue-row-token">#2</div>
+            <div style="width:8px; height:8px; border-radius:50%; background:var(--accent-yellow); flex-shrink:0;"></div>
+            <div class="queue-row-name">
+              <strong>Priya Sharma</strong>
+              <span>Appointment · General</span>
+            </div>
+            <div class="queue-row-wait">~12 min</div>
+          </div>
+          <div class="queue-row">
+            <div class="queue-row-token">#3</div>
+            <div style="width:8px; height:8px; border-radius:50%; background:var(--cream-400); flex-shrink:0;"></div>
+            <div class="queue-row-name">
+              <strong>Amit Patel</strong>
+              <span>Walk-in · Dermatology</span>
+            </div>
+            <div class="queue-row-wait">~25 min</div>
+          </div>
+        </div>
+        <div class="component-info">
+          <h4>Queue Row</h4>
+          <table>
+            <tr><td>Active (now)</td><td>Crimson border + very light crimson bg tint</td></tr>
+            <tr><td>Token number</td><td>Fredoka 700, 22px, crimson color</td></tr>
+            <tr><td>Status dot</td><td>8px circle: crimson = now, yellow = next, gray = waiting</td></tr>
+            <tr><td>Height</td><td><code>min-height: 60px</code>, <code>padding: 16px 20px</code></td></tr>
+            <tr><td>Radius</td><td><code>12px</code></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Token badge -->
+      <div class="component-card">
+        <div class="component-preview" style="gap:16px;">
+          <div class="token-badge">
+            <div class="token-number" style="background:var(--crimson-500);">23</div>
+            <div class="token-info">
+              <div class="token-status" style="color:var(--crimson-500);">Now Serving</div>
+              <div class="token-name">Rajesh Kumar</div>
+            </div>
+          </div>
+          <div class="token-badge">
+            <div class="token-number" style="background:var(--accent-yellow);">24</div>
+            <div class="token-info">
+              <div class="token-status" style="color:var(--orange);">Up Next</div>
+              <div class="token-name">Priya Sharma</div>
+            </div>
+          </div>
+          <div class="token-badge">
+            <div class="token-number" style="background:var(--crimson-800);">25</div>
+            <div class="token-info">
+              <div class="token-status" style="color:var(--text-muted);">Waiting</div>
+              <div class="token-name">Amit Patel</div>
+            </div>
+          </div>
+        </div>
+        <div class="component-info">
+          <h4>Token Number Badge</h4>
+          <table>
+            <tr><td>Shape</td><td><code>border-radius: 12px</code>, 52×52px</td></tr>
+            <tr><td>Now (active)</td><td>Crimson bg <code>#C43055</code></td></tr>
+            <tr><td>Next</td><td>Yellow bg <code>#F0C030</code></td></tr>
+            <tr><td>Waiting</td><td>Dark maroon <code>#4E0E20</code></td></tr>
+            <tr><td>Number font</td><td>Fredoka 700, 22px white</td></tr>
+            <tr><td>Label</td><td>DM Sans 10px uppercase, matching color</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Phone lookup with dropdown -->
+      <div class="component-card">
+        <div class="component-preview" style="align-items:flex-start; padding: 40px 32px;">
+          <div class="phone-lookup-demo">
+            <input class="phone-lookup-input" type="tel" placeholder="+91 98765 43210" value="+91 987...">
+            <div class="phone-lookup-icon">→</div>
+            <div class="lookup-dropdown">
+              <div class="lookup-result">
+                <div class="lookup-avatar" style="background:linear-gradient(135deg,#D95570,#A02040);">RK</div>
+                <div>
+                  <div class="lookup-name">Rajesh Kumar</div>
+                  <div class="lookup-meta">Last visit: Jan 15, 2025 · 3 visits</div>
+                </div>
+              </div>
+              <div class="lookup-result">
+                <div class="lookup-avatar" style="background:linear-gradient(135deg,#5AB09A,#3A8070);">PS</div>
+                <div>
+                  <div class="lookup-name">Priya Sharma</div>
+                  <div class="lookup-meta">Last visit: Dec 3, 2024 · 1 visit</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="component-info">
+          <h4>Phone Lookup (F1 — Core Feature)</h4>
+          <table>
+            <tr><td>Input shape</td><td>Pill <code>border-radius: 100px</code></td></tr>
+            <tr><td>Search icon</td><td>32px circle, crimson bg, white arrow icon</td></tr>
+            <tr><td>Dropdown</td><td><code>border-radius: 16px</code>, white, large shadow</td></tr>
+            <tr><td>Result row</td><td>Avatar + name + meta, <code>48px tall</code></td></tr>
+            <tr><td>Avatar</td><td>36px circle, gradient from brand palette, initials</td></tr>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<!-- SECTION 5: VISUAL MOOD -->
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<section class="section" id="mood">
+  <div class="section-header">
+    <div class="section-number">5</div>
+    <h2 class="section-title">Visual Mood & Aesthetic</h2>
+  </div>
+
+  <div class="mood-board">
+    <div class="mood-card" style="background: linear-gradient(135deg, var(--crimson-100), var(--crimson-200));">
+      <div class="mood-icon">💊</div>
+      <div class="mood-word" style="font-family:var(--font-display); color:var(--crimson-700);">Warm<br>& Caring</div>
+      <div class="mood-desc" style="color:var(--crimson-600);">Not cold clinical blue. The warm crimson-cream palette signals that ClinicOS cares about people, not just processes. Healthcare can be warm.</div>
+    </div>
+    <div class="mood-card" style="background: linear-gradient(135deg, var(--cream-100), var(--cream-200));">
+      <div class="mood-icon">🎠</div>
+      <div class="mood-word" style="font-family:var(--font-display); color:var(--text-primary);">Playfully<br>Professional</div>
+      <div class="mood-desc" style="color:var(--text-body);">Fredoka's rounded letterforms, pill buttons, and friendly card shapes make complex clinic operations feel approachable. Fun, but not frivolous.</div>
+    </div>
+    <div class="mood-card" style="background: linear-gradient(135deg, #E8F4F0, #CCEBE3);">
+      <div class="mood-icon">⚡</div>
+      <div class="mood-word" style="font-family:var(--font-display); color:var(--accent-teal);">Fast &<br>Confident</div>
+      <div class="mood-desc" style="color:#3A7060;">Bold typography at large sizes, strong crimson colour blocking, and generous white space communicate decisiveness. This software is quick and certain.</div>
+    </div>
+    <div class="mood-card" style="background: linear-gradient(135deg, var(--crimson-800), var(--crimson-900));">
+      <div class="mood-icon">🌙</div>
+      <div class="mood-word" style="font-family:var(--font-display); color:white;">Depth &<br>Substance</div>
+      <div class="mood-desc" style="color:rgba(255,255,255,0.7);">The multi-layer header, card shadows, and color gradient depth system create a sense that this product has real substance beneath its friendly surface.</div>
+    </div>
+    <div class="mood-card" style="background: linear-gradient(135deg, rgba(240,192,48,0.15), rgba(240,192,48,0.3));">
+      <div class="mood-icon">✨</div>
+      <div class="mood-word" style="font-family:var(--font-display); color:#8A5000;">Moments<br>of Delight</div>
+      <div class="mood-desc" style="color:#6A4000;">The yellow CTA against crimson, rainbow chart arcs, colored avatar gradients — surprising pops of color that reward attention and create memorable moments.</div>
+    </div>
+    <div class="mood-card" style="background: linear-gradient(135deg, #EEE8F8, #DDD0F0);">
+      <div class="mood-icon">📱</div>
+      <div class="mood-word" style="font-family:var(--font-display); color:var(--accent-lavender);">Mobile<br>Native</div>
+      <div class="mood-desc" style="color:#6050A0;">Phone mockups as hero visuals. Touch-friendly 48px min tap targets. Everything feels designed for a finger first, a mouse second.</div>
+    </div>
+  </div>
+
+  <!-- Design principles -->
+  <div class="subsection">
+    <h3 class="subsection-title">Design Principles</h3>
+    <div class="principle-grid">
+      <div class="principle-card">
+        <div class="principle-number">01</div>
+        <div class="principle-title">Rounded Over Sharp</div>
+        <div class="principle-desc">Every element — buttons, cards, inputs, avatars, even the page itself — has generous border-radius. Minimum 12px; maximum 100px (pill). The roundness communicates safety, friendliness, and approachability. Sharp corners are a last resort for data tables only.</div>
+      </div>
+      <div class="principle-card">
+        <div class="principle-number">02</div>
+        <div class="principle-title">Warm Backgrounds, Never Cold</div>
+        <div class="principle-desc">The cream palette (#F5EDD8, #EDE3C8) is non-negotiable. Never use grey or pure white as a main background. The warmth is what differentiates ClinicOS from generic SaaS dashboards. It also reduces eye strain in clinic environments where screens are on all day.</div>
+      </div>
+      <div class="principle-card">
+        <div class="principle-number">03</div>
+        <div class="principle-title">Depth Through Layering</div>
+        <div class="principle-desc">The signature layered header with progressively darker bands behind the main nav creates physical depth. This principle extends to all overlapping elements: cards cast subtle shadows, modals lift from the page, dropdowns float. Never flat when depth adds meaning.</div>
+      </div>
+      <div class="principle-card">
+        <div class="principle-number">04</div>
+        <div class="principle-title">Fredoka for Headlines, Always</div>
+        <div class="principle-desc">The brand personality lives in the display font. Every headline, number, token badge, and logo uses Fredoka. It must never be mixed with another display font. DM Sans handles all UI copy and body text — these two fonts must never cross their domains.</div>
+      </div>
+      <div class="principle-card">
+        <div class="principle-number">05</div>
+        <div class="principle-title">One Strong CTA Per Screen</div>
+        <div class="principle-desc">Following the reference site exactly — there is one primary action per screen. On dark backgrounds it's the yellow button. On light backgrounds it's the dark maroon button. Multiple primary CTAs compete and cancel each other. One wins; the rest are secondary or ghost.</div>
+      </div>
+      <div class="principle-card">
+        <div class="principle-number">06</div>
+        <div class="principle-title">Numbers Are Heroes</div>
+        <div class="principle-desc">In clinic dashboards, numbers matter most. Patients seen: 47. Revenue: ₹12,450. Wait time: 23 mins. These numbers should be displayed in Fredoka at the largest possible size, with supporting context in small DM Sans below. Make the number the first thing the eye lands on.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Do / Don't -->
+  <div class="subsection">
+    <h3 class="subsection-title">Do & Don't</h3>
+    <div class="do-dont">
+      <div class="do-card">
+        <div class="do-header">✓ Do</div>
+        <div class="do-body">
+          <strong>Use warm cream backgrounds</strong> (#F5EDD8) as the default page surface<br><br>
+          <strong>Use Fredoka for all headings</strong>, numbers, and the logo<br><br>
+          <strong>Round everything generously</strong> — minimum 12px radius on any card or input<br><br>
+          <strong>Use the layered header</strong> effect on the navigation at all times<br><br>
+          <strong>Keep section labels</strong> as outlined pills above every major heading<br><br>
+          <strong>Use the yellow CTA</strong> (#F0C030) for the single most important action on dark sections<br><br>
+          <strong>Give cards generous shadow</strong> and clear visual hierarchy inside them<br><br>
+          <strong>Show phone mockups</strong> of the app UI in hero and feature sections
+        </div>
+      </div>
+      <div class="dont-card">
+        <div class="dont-header">✗ Don't</div>
+        <div class="do-body">
+          <strong>Use grey or cool-tone backgrounds</strong> — they break the warm, caring aesthetic<br><br>
+          <strong>Use Inter, Roboto, or system fonts</strong> for headlines — only Fredoka<br><br>
+          <strong>Use sharp corners</strong> (0px radius) on any interactive element or card<br><br>
+          <strong>Use purple gradients on white</strong> — generic SaaS look that conflicts with this brand<br><br>
+          <strong>Use more than one primary CTA</strong> on the same screen section<br><br>
+          <strong>Mix too many accent colors</strong> in one section — max 2 accent colors per component<br><br>
+          <strong>Use clinical blue</strong> as the primary brand color — reserved for info states only<br><br>
+          <strong>Display small body text</strong> on the crimson background — maintain 4.5:1 contrast ratio
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<!-- SECTION 6: SPACING -->
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<section class="section" id="spacing">
+  <div class="section-header">
+    <div class="section-number">6</div>
+    <h2 class="section-title">Spacing & Sizing Guidelines</h2>
+  </div>
+
+  <div class="subsection">
+    <h3 class="subsection-title">8px Base Grid — Spacing Scale</h3>
+    <div class="spacing-grid">
+      <div class="spacing-row"><div class="spacing-name">--sp-1</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:4px;"></div><div class="spacing-value">4px</div><div style="font-size:11px; color:var(--text-muted);">Micro gap, icon spacing</div></div></div>
+      <div class="spacing-row"><div class="spacing-name">--sp-2</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:8px;"></div><div class="spacing-value">8px</div><div style="font-size:11px; color:var(--text-muted);">Tight element spacing</div></div></div>
+      <div class="spacing-row"><div class="spacing-name">--sp-3</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:12px;"></div><div class="spacing-value">12px</div><div style="font-size:11px; color:var(--text-muted);">Small padding, badge gaps</div></div></div>
+      <div class="spacing-row"><div class="spacing-name">--sp-4</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:16px;"></div><div class="spacing-value">16px</div><div style="font-size:11px; color:var(--text-muted);">Default gap, row padding</div></div></div>
+      <div class="spacing-row"><div class="spacing-name">--sp-5</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:20px;"></div><div class="spacing-value">20px</div><div style="font-size:11px; color:var(--text-muted);">Card internal padding (compact)</div></div></div>
+      <div class="spacing-row"><div class="spacing-name">--sp-6</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:24px;"></div><div class="spacing-value">24px</div><div style="font-size:11px; color:var(--text-muted);">Card padding (standard)</div></div></div>
+      <div class="spacing-row"><div class="spacing-name">--sp-8</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:32px;"></div><div class="spacing-value">32px</div><div style="font-size:11px; color:var(--text-muted);">Card padding (large), grid gap</div></div></div>
+      <div class="spacing-row"><div class="spacing-name">--sp-10</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:40px;"></div><div class="spacing-value">40px</div><div style="font-size:11px; color:var(--text-muted);">Between sections (compact)</div></div></div>
+      <div class="spacing-row"><div class="spacing-name">--sp-12</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:48px;"></div><div class="spacing-value">48px</div><div style="font-size:11px; color:var(--text-muted);">Component group spacing</div></div></div>
+      <div class="spacing-row"><div class="spacing-name">--sp-16</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:64px;"></div><div class="spacing-value">64px</div><div style="font-size:11px; color:var(--text-muted);">Section padding (standard)</div></div></div>
+      <div class="spacing-row"><div class="spacing-name">--sp-20</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:80px;"></div><div class="spacing-value">80px</div><div style="font-size:11px; color:var(--text-muted);">Major section vertical padding</div></div></div>
+      <div class="spacing-row"><div class="spacing-name">--sp-24</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:96px;"></div><div class="spacing-value">96px</div><div style="font-size:11px; color:var(--text-muted);">Hero section top padding</div></div></div>
+      <div class="spacing-row"><div class="spacing-name">--sp-32</div><div class="spacing-bar-wrap"><div class="spacing-bar" style="width:128px;"></div><div class="spacing-value">128px</div><div style="font-size:11px; color:var(--text-muted);">Hero / landing section full padding</div></div></div>
+    </div>
+  </div>
+
+  <!-- Border radius -->
+  <div class="subsection">
+    <h3 class="subsection-title">Border Radius Scale</h3>
+    <div class="radius-grid">
+      <div class="radius-item"><div class="radius-box" style="border-radius:8px;"></div><div class="radius-label">--radius-sm</div><div class="radius-val">8px</div></div>
+      <div class="radius-item"><div class="radius-box" style="border-radius:16px;"></div><div class="radius-label">--radius-md</div><div class="radius-val">16px</div></div>
+      <div class="radius-item"><div class="radius-box" style="border-radius:24px;"></div><div class="radius-label">--radius-lg</div><div class="radius-val">24px</div></div>
+      <div class="radius-item"><div class="radius-box" style="border-radius:32px;"></div><div class="radius-label">--radius-xl</div><div class="radius-val">32px</div></div>
+      <div class="radius-item"><div class="radius-box" style="border-radius:48px;"></div><div class="radius-label">--radius-2xl</div><div class="radius-val">48px</div></div>
+      <div class="radius-item"><div class="radius-box" style="border-radius:100px; width:120px;"></div><div class="radius-label">--radius-pill</div><div class="radius-val">100px</div></div>
+    </div>
+
+    <table class="spec-table">
+      <thead><tr><th>Token</th><th>Value</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td>--radius-sm</td><td><code>8px</code></td><td>Table rows, small chips, code tags</td></tr>
+        <tr><td>--radius-md</td><td><code>16px</code></td><td>Input fields, dropdown menus, small cards, metric cards</td></tr>
+        <tr><td>--radius-lg</td><td><code>24px</code></td><td>Standard cards, stat cards, modals</td></tr>
+        <tr><td>--radius-xl</td><td><code>32px</code></td><td>Large feature cards, patient profile cards</td></tr>
+        <tr><td>--radius-2xl</td><td><code>48px</code></td><td>Navigation, hero section containers</td></tr>
+        <tr><td>--radius-pill</td><td><code>100px</code></td><td>All buttons, badges, pills, phone lookup input</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Shadows -->
+  <div class="subsection">
+    <h3 class="subsection-title">Shadow System</h3>
+    <table class="spec-table">
+      <thead><tr><th>Token</th><th>Value</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td>--shadow-sm</td><td><code>0 2px 8px rgba(30,9,16,0.08)</code></td><td>Subtle elevation: input fields, list rows on hover</td></tr>
+        <tr><td>--shadow-card</td><td><code>0 4px 20px rgba(30,9,16,0.10), 0 1px 4px rgba(30,9,16,0.06)</code></td><td>Standard cards — the double-shadow creates realism</td></tr>
+        <tr><td>--shadow-md</td><td><code>0 6px 24px rgba(30,9,16,0.12)</code></td><td>Floating UI: dropdowns, tooltips, date pickers</td></tr>
+        <tr><td>--shadow-lg</td><td><code>0 16px 48px rgba(30,9,16,0.18)</code></td><td>Modals, drawer panels, full overlays</td></tr>
+        <tr><td>Button shadow</td><td><code>0 4px 12px rgba(30,9,16,0.25)</code></td><td>Primary button resting state</td></tr>
+        <tr><td>Yellow glow</td><td><code>0 4px 16px rgba(240,192,48,0.4)</code></td><td>CTA yellow button only — warm glow effect</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Touch targets -->
+  <div class="subsection">
+    <h3 class="subsection-title">Touch Target & Sizing Minimums</h3>
+    <table class="spec-table">
+      <thead><tr><th>Element</th><th>Minimum Size</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Any button</td><td><code>44px height</code></td><td>Mobile touch target minimum per Apple HIG / Material</td></tr>
+        <tr><td>Icon button</td><td><code>44×44px</code></td><td>Always include 8px padding around the icon itself</td></tr>
+        <tr><td>Input field</td><td><code>48px height</code></td><td>Larger than standard for easy tap in clinical settings</td></tr>
+        <tr><td>Queue row tap area</td><td><code>60px height</code></td><td>Staff taps these dozens of times per hour; needs reliability</td></tr>
+        <tr><td>Avatar circle</td><td><code>36px</code> (small), <code>56px</code> (card), <code>80px</code> (profile)</td><td>Three standard sizes only</td></tr>
+        <tr><td>Token badge</td><td><code>52×52px</code></td><td>Must be large enough to read from across a small room</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<!-- SECTION 7: CLINICOS SPECIFIC -->
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<section class="section" id="clinicos">
+  <div class="section-header">
+    <div class="section-number">7</div>
+    <h2 class="section-title">ClinicOS-Specific Design Decisions</h2>
+  </div>
+
+  <div class="callout">
+    The Pomegranate Health reference is a consumer health app. ClinicOS is a B2B2C clinic management platform. These adaptations are required to apply the visual language to the ClinicOS context correctly.
+  </div>
+
+  <table class="spec-table" style="margin-bottom:40px;">
+    <thead><tr><th>Design Decision</th><th>Pomegranate Reference</th><th>ClinicOS Adaptation</th></tr></thead>
+    <tbody>
+      <tr><td>Primary audience screen</td><td>Consumer mobile app</td><td>Staff desktop/tablet dashboard is the primary screen — must work at 1280px+</td></tr>
+      <tr><td>Data density</td><td>Low — one metric per card</td><td>Higher — queue rows, patient lists, stats grids are all dense; maintain breathing room within each row</td></tr>
+      <tr><td>Color on status</td><td>Used decoratively</td><td>Must carry semantic meaning: crimson = active/urgent, yellow = next/warning, teal = done/healthy, gray = waiting</td></tr>
+      <tr><td>Font size minimum</td><td>Consumer: comfortable sizing</td><td>Clinic: 14px body minimum — rooms are sometimes dim; screens may be viewed at distance</td></tr>
+      <tr><td>Button labeling</td><td>Brand-focused ("Join Waiting List")</td><td>Action-focused ("Issue Token", "Mark Served", "Generate Bill") — clarity over cleverness</td></tr>
+      <tr><td>Navigation</td><td>Single global nav</td><td>Role-based portals: Patient / Doctor / Staff / Admin each have their own nav context</td></tr>
+      <tr><td>Crimson usage</td><td>Decorative, brand</td><td>Crimson = also emergency/urgent state; use sparingly in non-emergency dashboard contexts to preserve signal value</td></tr>
+      <tr><td>Animation</td><td>Used freely for delight</td><td>Limit to transitions < 200ms for queue updates; heavy animations distract staff during patient management</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Role color system -->
+  <div class="subsection">
+    <h3 class="subsection-title">Role-Based Color Accents</h3>
+    <div class="palette-grid">
+      <div class="swatch-card">
+        <div class="swatch-block" style="background:linear-gradient(135deg,#D95570,#A02040);"></div>
+        <div class="swatch-info">
+          <span class="swatch-name">Receptionist / Staff</span>
+          <span class="swatch-hex">Crimson gradient</span>
+          <span class="swatch-use">Portal accent, nav highlight</span>
+        </div>
+      </div>
+      <div class="swatch-card">
+        <div class="swatch-block" style="background:linear-gradient(135deg,#5AB09A,#3A8070);"></div>
+        <div class="swatch-info">
+          <span class="swatch-name">Doctor</span>
+          <span class="swatch-hex">Teal gradient</span>
+          <span class="swatch-use">Doctor portal, consultation state</span>
+        </div>
+      </div>
+      <div class="swatch-card">
+        <div class="swatch-block" style="background:linear-gradient(135deg,#9080C0,#6050A0);"></div>
+        <div class="swatch-info">
+          <span class="swatch-name">Admin / Analytics</span>
+          <span class="swatch-hex">Lavender gradient</span>
+          <span class="swatch-use">Admin portal, chart accent</span>
+        </div>
+      </div>
+      <div class="swatch-card">
+        <div class="swatch-block" style="background:linear-gradient(135deg,#F0C030,#C89010);"></div>
+        <div class="swatch-info">
+          <span class="swatch-name">Patient</span>
+          <span class="swatch-hex">Amber gradient</span>
+          <span class="swatch-use">Patient portal nav, token badge</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<!-- SECTION 8: CSS VARIABLES EXPORT -->
+<!-- ─────────────────────────────────────────────────────────────────────────── -->
+<section class="section" id="code">
+  <div class="section-header">
+    <div class="section-number">8</div>
+    <h2 class="section-title">CSS Variables — Developer Export</h2>
+  </div>
+
+  <div class="callout">
+    Copy this block into your <code>global.css</code> or <code>tailwind.config.js</code> (as <code>extend.colors</code>). All values are exact hex codes extracted from the Pomegranate Health reference and documented in sections above.
+  </div>
+
+  <div class="code-block">
+<span class="code-comment">/* ═══════════════════════════════════════════════════════════
+   ClinicOS Design System — CSS Custom Properties
+   Based on: Pomegranate Health visual reference
+   Generated: 2026
+   ═══════════════════════════════════════════════════════════ */</span>
+
+<span class="code-section">:root {</span>
+  <span class="code-comment">/* ── Primary Crimson Scale ───────────────────────── */</span>
+  <span class="code-var">--color-crimson-100</span>: <span class="code-value">#FBEAF0</span>;  <span class="code-comment">/* hover bg, tinted surfaces */</span>
+  <span class="code-var">--color-crimson-200</span>: <span class="code-value">#F2C5D4</span>;  <span class="code-comment">/* light borders, dividers */</span>
+  <span class="code-var">--color-crimson-300</span>: <span class="code-value">#E89098</span>;  <span class="code-comment">/* icons, decorative accents */</span>
+  <span class="code-var">--color-crimson-400</span>: <span class="code-value">#D95570</span>;  <span class="code-comment">/* nav gradient top, card headers */</span>
+  <span class="code-var">--color-crimson-500</span>: <span class="code-value">#C43055</span>;  <span class="code-comment">/* PRIMARY BRAND — focus, links */</span>
+  <span class="code-var">--color-crimson-600</span>: <span class="code-value">#A02040</span>;  <span class="code-comment">/* nav gradient mid, hover */</span>
+  <span class="code-var">--color-crimson-700</span>: <span class="code-value">#7A1530</span>;  <span class="code-comment">/* nav gradient dark band */</span>
+  <span class="code-var">--color-crimson-800</span>: <span class="code-value">#4E0E20</span>;  <span class="code-comment">/* PRIMARY CTA button, darkest band */</span>
+  <span class="code-var">--color-crimson-900</span>: <span class="code-value">#1C0910</span>;  <span class="code-comment">/* headline text color */</span>
+
+  <span class="code-comment">/* ── Warm Cream Neutrals ────────────────────────── */</span>
+  <span class="code-var">--color-cream-50</span>:  <span class="code-value">#FDFAF4</span>;  <span class="code-comment">/* global page background */</span>
+  <span class="code-var">--color-cream-100</span>: <span class="code-value">#F5EDD8</span>;  <span class="code-comment">/* PRIMARY section background ★ */</span>
+  <span class="code-var">--color-cream-200</span>: <span class="code-value">#EDE3C8</span>;  <span class="code-comment">/* alternate section, nav bg */</span>
+  <span class="code-var">--color-cream-300</span>: <span class="code-value">#E0D4B5</span>;  <span class="code-comment">/* card borders, dividers */</span>
+  <span class="code-var">--color-cream-400</span>: <span class="code-value">#C8BB9A</span>;  <span class="code-comment">/* disabled borders */</span>
+
+  <span class="code-comment">/* ── Text Colors ────────────────────────────────── */</span>
+  <span class="code-var">--color-text-primary</span>:   <span class="code-value">#1C0910</span>;  <span class="code-comment">/* headlines, high-emphasis */</span>
+  <span class="code-var">--color-text-secondary</span>: <span class="code-value">#3C1C28</span>;  <span class="code-comment">/* subheadings, labels */</span>
+  <span class="code-var">--color-text-body</span>:      <span class="code-value">#5C3040</span>;  <span class="code-comment">/* all body copy */</span>
+  <span class="code-var">--color-text-muted</span>:     <span class="code-value">#8A6070</span>;  <span class="code-comment">/* captions, placeholders */</span>
+  <span class="code-var">--color-text-on-dark</span>:   <span class="code-value">#FFFFFF</span>;  <span class="code-comment">/* text on crimson backgrounds */</span>
+
+  <span class="code-comment">/* ── Accent Colors ──────────────────────────────── */</span>
+  <span class="code-var">--color-accent-yellow</span>:   <span class="code-value">#F0C030</span>;  <span class="code-comment">/* PRIMARY CTA on dark sections */</span>
+  <span class="code-var">--color-accent-peach</span>:    <span class="code-value">#F0A078</span>;  <span class="code-comment">/* warning card headers */</span>
+  <span class="code-var">--color-accent-teal</span>:     <span class="code-value">#5AB09A</span>;  <span class="code-comment">/* success, healthy, done */</span>
+  <span class="code-var">--color-accent-lavender</span>: <span class="code-value">#9080C0</span>;  <span class="code-comment">/* admin, secondary charts */</span>
+  <span class="code-var">--color-accent-sky</span>:      <span class="code-value">#70B8D8</span>;  <span class="code-comment">/* info state, chart arc */</span>
+  <span class="code-var">--color-error</span>:           <span class="code-value">#E85060</span>;  <span class="code-comment">/* error, emergency alert */</span>
+
+  <span class="code-comment">/* ── Gradients ──────────────────────────────────── */</span>
+  <span class="code-var">--gradient-nav</span>: <span class="code-value">linear-gradient(160deg, #D95570 0%, #A02040 55%, #4E0E20 100%)</span>;
+  <span class="code-var">--gradient-footer</span>: <span class="code-value">linear-gradient(180deg, #C43055 0%, #8C1A32 100%)</span>;
+  <span class="code-var">--gradient-cream</span>: <span class="code-value">linear-gradient(135deg, #F5EDD8 0%, #EDE3C8 100%)</span>;
+  <span class="code-var">--gradient-hero-glow</span>: <span class="code-value">radial-gradient(ellipse at 60% 40%, rgba(240,192,48,0.3) 0%, rgba(196,48,85,0.15) 50%, transparent 80%), #F5EDD8</span>;
+
+  <span class="code-comment">/* ── Border Radius ──────────────────────────────── */</span>
+  <span class="code-var">--radius-sm</span>:   <span class="code-value">8px</span>;    <span class="code-comment">/* table rows, chips */</span>
+  <span class="code-var">--radius-md</span>:   <span class="code-value">16px</span>;   <span class="code-comment">/* inputs, small cards, dropdowns */</span>
+  <span class="code-var">--radius-lg</span>:   <span class="code-value">24px</span>;   <span class="code-comment">/* standard cards, modals */</span>
+  <span class="code-var">--radius-xl</span>:   <span class="code-value">32px</span>;   <span class="code-comment">/* large feature cards */</span>
+  <span class="code-var">--radius-2xl</span>:  <span class="code-value">48px</span>;   <span class="code-comment">/* navigation, hero containers */</span>
+  <span class="code-var">--radius-pill</span>: <span class="code-value">100px</span>;  <span class="code-comment">/* all buttons, badges, pill inputs */</span>
+
+  <span class="code-comment">/* ── Spacing (8px base) ─────────────────────────── */</span>
+  <span class="code-var">--sp-1</span>: <span class="code-value">4px</span>;   <span class="code-var">--sp-2</span>: <span class="code-value">8px</span>;   <span class="code-var">--sp-3</span>: <span class="code-value">12px</span>;  <span class="code-var">--sp-4</span>: <span class="code-value">16px</span>;
+  <span class="code-var">--sp-5</span>: <span class="code-value">20px</span>;  <span class="code-var">--sp-6</span>: <span class="code-value">24px</span>;  <span class="code-var">--sp-8</span>: <span class="code-value">32px</span>;  <span class="code-var">--sp-10</span>: <span class="code-value">40px</span>;
+  <span class="code-var">--sp-12</span>: <span class="code-value">48px</span>; <span class="code-var">--sp-16</span>: <span class="code-value">64px</span>; <span class="code-var">--sp-20</span>: <span class="code-value">80px</span>; <span class="code-var">--sp-24</span>: <span class="code-value">96px</span>;
+  <span class="code-var">--sp-32</span>: <span class="code-value">128px</span>;
+
+  <span class="code-comment">/* ── Shadows ────────────────────────────────────── */</span>
+  <span class="code-var">--shadow-sm</span>:   <span class="code-value">0 2px 8px rgba(30,9,16,0.08)</span>;
+  <span class="code-var">--shadow-card</span>: <span class="code-value">0 4px 20px rgba(30,9,16,0.10), 0 1px 4px rgba(30,9,16,0.06)</span>;
+  <span class="code-var">--shadow-md</span>:   <span class="code-value">0 6px 24px rgba(30,9,16,0.12)</span>;
+  <span class="code-var">--shadow-lg</span>:   <span class="code-value">0 16px 48px rgba(30,9,16,0.18)</span>;
+  <span class="code-var">--shadow-btn</span>:  <span class="code-value">0 4px 12px rgba(30,9,16,0.25)</span>;
+  <span class="code-var">--shadow-cta</span>:  <span class="code-value">0 4px 16px rgba(240,192,48,0.4)</span>;
+
+  <span class="code-comment">/* ── Typography ─────────────────────────────────── */</span>
+  <span class="code-var">--font-display</span>: <span class="code-value">'Fredoka', system-ui, sans-serif</span>;
+  <span class="code-var">--font-body</span>:    <span class="code-value">'DM Sans', system-ui, sans-serif</span>;
+<span class="code-section">}</span>
+
+<span class="code-comment">/* Google Fonts import (add to &lt;head&gt;) */</span>
+<span class="code-comment">/* https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap */</span>
+  </div>
+
+  <!-- Tailwind config -->
+  <div class="subsection">
+    <h3 class="subsection-title">Tailwind Config Extension</h3>
+    <div class="code-block">
+<span class="code-comment">// tailwind.config.js</span>
+module.exports = {
+  theme: {
+    extend: {
+      colors: {
+        crimson: {
+          100: <span class="code-value">'#FBEAF0'</span>,
+          200: <span class="code-value">'#F2C5D4'</span>,
+          300: <span class="code-value">'#E89098'</span>,
+          400: <span class="code-value">'#D95570'</span>,
+          500: <span class="code-value">'#C43055'</span>,  <span class="code-comment">// brand primary</span>
+          600: <span class="code-value">'#A02040'</span>,
+          700: <span class="code-value">'#7A1530'</span>,
+          800: <span class="code-value">'#4E0E20'</span>,  <span class="code-comment">// CTA button</span>
+          900: <span class="code-value">'#1C0910'</span>,  <span class="code-comment">// headline text</span>
+        },
+        cream: {
+          50:  <span class="code-value">'#FDFAF4'</span>,  <span class="code-comment">// page bg</span>
+          100: <span class="code-value">'#F5EDD8'</span>,  <span class="code-comment">// section bg</span>
+          200: <span class="code-value">'#EDE3C8'</span>,
+          300: <span class="code-value">'#E0D4B5'</span>,  <span class="code-comment">// card borders</span>
+          400: <span class="code-value">'#C8BB9A'</span>,
+        },
+        accent: {
+          yellow:   <span class="code-value">'#F0C030'</span>,
+          peach:    <span class="code-value">'#F0A078'</span>,
+          teal:     <span class="code-value">'#5AB09A'</span>,
+          lavender: <span class="code-value">'#9080C0'</span>,
+          sky:      <span class="code-value">'#70B8D8'</span>,
+        },
+      },
+      fontFamily: {
+        display: [<span class="code-value">'Fredoka'</span>, <span class="code-value">'system-ui'</span>, <span class="code-value">'sans-serif'</span>],
+        body:    [<span class="code-value">'DM Sans'</span>,  <span class="code-value">'system-ui'</span>, <span class="code-value">'sans-serif'</span>],
+      },
+      borderRadius: {
+        'sm':   <span class="code-value">'8px'</span>,
+        'md':   <span class="code-value">'16px'</span>,
+        'lg':   <span class="code-value">'24px'</span>,
+        'xl':   <span class="code-value">'32px'</span>,
+        '2xl':  <span class="code-value">'48px'</span>,
+        'pill': <span class="code-value">'100px'</span>,
+      },
+    },
+  },
+}
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ═══ FOOTER ════════════════════════════════════════════════════════════════ -->
+<footer class="doc-footer">
+  <strong>ClinicOS Design System</strong><br><br>
+  Extracted from: pomegranate.health — visual reference<br>
+  Fonts: Fredoka (display) + DM Sans (body) via Google Fonts<br>
+  Base grid: 8px · Primary brand: #C43055 · Background: #F5EDD8<br><br>
+  <span style="opacity:0.5;">Share with developers or AI tools to reproduce this exact visual style.</span>
+</footer>
+
+</body>
+</html>

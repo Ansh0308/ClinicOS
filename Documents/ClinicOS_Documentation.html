@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClinicOS · Product & Tech Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2230;
+    --border: #30363d;
+    --accent: #e04b67;
+    --accent2: #f2c24a;
+    --accent3: #7ecfb5;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --text-faint: #484f58;
+    --sidebar-w: 280px;
+    --header-h: 56px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: var(--header-h);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    z-index: 100;
+    gap: 16px;
+  }
+
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+    flex-shrink: 0;
+  }
+
+  .logo span { color: var(--text-muted); font-style: italic; font-size: 14px; margin-left: 8px; }
+
+  .tab-bar {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  .tab-btn {
+    padding: 6px 18px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .tab-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .tab-btn:hover:not(.active) {
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: flex;
+    margin-top: var(--header-h);
+  }
+
+  /* ── SIDEBAR ── */
+  aside {
+    width: var(--sidebar-w);
+    height: calc(100vh - var(--header-h));
+    position: fixed;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  aside::-webkit-scrollbar { width: 4px; }
+  aside::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .nav-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    padding: 12px 20px 6px;
+  }
+
+  .nav-link {
+    display: block;
+    padding: 7px 20px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 2px solid transparent;
+    transition: all 0.12s;
+    line-height: 1.4;
+  }
+
+  .nav-link:hover {
+    color: var(--text);
+    background: var(--surface2);
+    border-left-color: var(--text-faint);
+  }
+
+  .nav-link.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: rgba(224, 75, 103, 0.06);
+  }
+
+  /* ── MAIN CONTENT ── */
+  main {
+    margin-left: var(--sidebar-w);
+    padding: 48px 64px;
+    max-width: calc(var(--sidebar-w) + 900px);
+    width: 100%;
+    min-height: calc(100vh - var(--header-h));
+  }
+
+  .doc-panel { display: none; }
+  .doc-panel.active { display: block; }
+
+  /* ── DOCUMENT META BANNER ── */
+  .doc-meta {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    padding: 28px 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 48px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .doc-meta::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 4px; height: 100%;
+    background: var(--accent);
+  }
+
+  .doc-meta-icon {
+    font-size: 36px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  .doc-meta h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    color: var(--text);
+    line-height: 1.2;
+    margin-bottom: 6px;
+  }
+
+  .doc-meta p {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+
+  .badge-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid;
+  }
+
+  .badge-red { color: var(--accent); border-color: rgba(224,75,103,0.3); background: rgba(224,75,103,0.08); }
+  .badge-gold { color: var(--accent2); border-color: rgba(242,194,74,0.3); background: rgba(242,194,74,0.08); }
+  .badge-green { color: var(--accent3); border-color: rgba(126,207,181,0.3); background: rgba(126,207,181,0.08); }
+  .badge-muted { color: var(--text-muted); border-color: var(--border); background: var(--surface2); }
+
+  /* ── SECTION HEADINGS ── */
+  .content h1, .content h2, .content h3, .content h4 {
+    font-family: 'DM Serif Display', serif;
+    scroll-margin-top: calc(var(--header-h) + 24px);
+  }
+
+  .content h2 {
+    font-size: 26px;
+    color: var(--text);
+    margin: 56px 0 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .content h3 {
+    font-size: 18px;
+    color: var(--accent2);
+    margin: 36px 0 14px;
+  }
+
+  .content h4 {
+    font-size: 15px;
+    color: var(--accent3);
+    margin: 28px 0 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+  }
+
+  .content p {
+    color: var(--text);
+    margin-bottom: 14px;
+    max-width: 72ch;
+  }
+
+  /* ── TABLES ── */
+  .content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0 32px;
+    font-size: 13px;
+    background: var(--surface);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .content th {
+    background: var(--surface2);
+    color: var(--text);
+    font-weight: 600;
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .content td {
+    padding: 10px 16px;
+    color: var(--text-muted);
+    border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  .content tr:last-child td { border-bottom: none; }
+  .content tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .content strong { color: var(--text); font-weight: 600; }
+
+  /* ── CODE BLOCKS ── */
+  .content code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--accent3);
+  }
+
+  .content pre {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 20px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #a5d6ff;
+  }
+
+  .content pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+
+  /* ── LISTS ── */
+  .content ul, .content ol {
+    padding-left: 20px;
+    margin-bottom: 16px;
+    max-width: 72ch;
+  }
+
+  .content li {
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    padding-left: 4px;
+  }
+
+  .content li::marker { color: var(--accent); }
+
+  /* ── BLOCKQUOTES / CALLOUT ── */
+  .content blockquote {
+    border-left: 3px solid var(--accent2);
+    background: rgba(242, 194, 74, 0.05);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+    color: var(--text-muted);
+  }
+
+  /* ── HORIZONTAL RULE ── */
+  .content hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  /* ── SCROLL TO TOP ── */
+  #scroll-top {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    width: 40px;
+    height: 40px;
+    background: var(--accent);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 200;
+  }
+
+  #scroll-top.visible { opacity: 1; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .doc-panel.active { animation: fadeUp 0.3s ease forwards; }
+
+  /* ── SCROLLBAR ── */
+  main::-webkit-scrollbar { width: 6px; }
+  main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">ClinicOS <span>Documentation</span></div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('prd')">PRD v3.0</button>
+    <button class="tab-btn" onclick="switchTab('tech')">Tech Stack</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- SIDEBAR PRD -->
+  <aside id="nav-prd">
+    <div class="nav-section-label">Overview</div>
+    <a class="nav-link" href="#prd-s1">1. Project Overview</a>
+    <a class="nav-link" href="#prd-s2">2. Target Audience</a>
+    <a class="nav-link" href="#prd-s3">3. Site Map</a>
+    <a class="nav-link" href="#prd-s4">4. Feature Overview</a>
+    <div class="nav-section-label">Features</div>
+    <a class="nav-link" href="#prd-s5">5. Must-Have (F1–F7)</a>
+    <a class="nav-link" href="#prd-s6">6. Should-Have (F8–F13)</a>
+    <a class="nav-link" href="#prd-s7">7. Additional (F14–F19)</a>
+    <a class="nav-link" href="#prd-s8">8. New Features (F20–F25)</a>
+    <div class="nav-section-label">Technical</div>
+    <a class="nav-link" href="#prd-s9">9. Data Model</a>
+    <a class="nav-link" href="#prd-s10">10. API Reference</a>
+    <a class="nav-link" href="#prd-s11">11. Messaging Templates</a>
+    <a class="nav-link" href="#prd-s12">12. Privacy &amp; Consent</a>
+    <div class="nav-section-label">Delivery</div>
+    <a class="nav-link" href="#prd-s13">13. Success Metrics / KPIs</a>
+    <a class="nav-link" href="#prd-s14">14. Tech Stack</a>
+    <a class="nav-link" href="#prd-s15">15. Acceptance Tests</a>
+    <a class="nav-link" href="#prd-s16">16. Developer Checklist</a>
+    <a class="nav-link" href="#prd-s17">17. Phased Roadmap</a>
+    <a class="nav-link" href="#prd-s18">18. Non-Functional Req.</a>
+    <a class="nav-link" href="#prd-s19">19. Risks &amp; Mitigations</a>
+    <a class="nav-link" href="#prd-s20">20. Next Steps</a>
+  </aside>
+
+  <!-- SIDEBAR TECH -->
+  <aside id="nav-tech" style="display:none;">
+    <div class="nav-section-label">Frontend</div>
+    <a class="nav-link" href="#tech-s1">1. React.js 18+</a>
+    <a class="nav-link" href="#tech-s2">2. Tailwind + shadcn/ui</a>
+    <div class="nav-section-label">Backend</div>
+    <a class="nav-link" href="#tech-s3">3. Node.js + Express</a>
+    <a class="nav-link" href="#tech-s4">4. PostgreSQL 16</a>
+    <a class="nav-link" href="#tech-s5">5. Package Registry</a>
+    <div class="nav-section-label">Infrastructure</div>
+    <a class="nav-link" href="#tech-s6">6. Deployment &amp; Hosting</a>
+    <a class="nav-link" href="#tech-s7">7. Dev Tools &amp; Workflow</a>
+    <a class="nav-link" href="#tech-s8">8. Architecture Overview</a>
+    <a class="nav-link" href="#tech-s9">9. Decision Summary</a>
+  </aside>
+
+  <main>
+
+    <!-- ─── PRD PANEL ─── -->
+    <div class="doc-panel active" id="panel-prd">
+      <div class="doc-meta">
+        <div class="doc-meta-icon">📋</div>
+        <div>
+          <h1>Product Requirements Document</h1>
+          <p>ClinicOS — Clinic Management &amp; Patient Experience Platform</p>
+          <div class="badge-row">
+            <span class="badge badge-red">Version 3.0</span>
+            <span class="badge badge-gold">Final</span>
+            <span class="badge badge-muted">Confidential</span>
+            <span class="badge badge-muted">26 February 2026</span>
+            <span class="badge badge-green">20 Sections · 25 Features</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+
+        <h2 id="prd-s1">1. Project Overview &amp; Goals</h2>
+        <h3>1.1 Executive Summary</h3>
+        <p>ClinicOS is an all-in-one clinic management platform that digitizes the complete patient lifecycle — from appointment booking and queue management to billing, visit history, and automated multi-channel communication. It eliminates paper-based processes, reduces wait times, and gives every role in a clinic (patient, doctor, staff, admin) a tailored, fast, and intuitive interface.</p>
+
+        <h3>1.2 Problem Statement</h3>
+        <ul>
+          <li>Patients wait 45–90 minutes with zero visibility into queue status or realistic ETAs</li>
+          <li>Doctors cannot recall last visit details, medications, or complaints without paper files</li>
+          <li>Front-desk staff manually manage tokens on whiteboards, leading to errors and queue chaos</li>
+          <li>Bills are printed on paper — no digital trail, no audit history, no easy resending</li>
+          <li>No automated communication; patients miss turns or arrive far too early</li>
+          <li>Clinic owners have no real-time visibility into revenue, throughput, or wait performance</li>
+        </ul>
+
+        <h3>1.3 MVP Definition</h3>
+        <blockquote>A working web app where staff can register/look up patients by phone, create and serve tokens, doctors can view history and record consultations, and the system sends automated WhatsApp/SMS/Email messages and records bills and visit history — accessible via role-based dashboards.</blockquote>
+
+        <h3>1.4 Strategic Goals</h3>
+        <ul>
+          <li>Reduce front-desk check-in to &lt; 20 seconds for returning patients</li>
+          <li>Replace manual token boards with automated real-time queue with ETA</li>
+          <li>Give doctors full patient history in &lt; 5 seconds</li>
+          <li>Automate 100% of routine patient communications (WhatsApp / SMS / Email)</li>
+          <li>Automate billing receipt delivery for all paid bills</li>
+          <li>Provide clinic owners live financial and operational dashboards</li>
+          <li>Achieve 40% reduction in average patient wait time within 3 months</li>
+        </ul>
+
+        <h2 id="prd-s2">2. Target Audience</h2>
+
+        <h3>2.1 Primary Users</h3>
+        <table>
+          <thead><tr><th>Role</th><th>Profile</th><th>Primary Goal</th><th>Key Pain Today</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Receptionist / Staff</strong></td><td>Daily operator, 30–100 patients/day, low training tolerance</td><td>Register patients in &lt;20s, manage queue, create bills</td><td>Paper tokens, manual lookups, no notification system</td></tr>
+            <tr><td><strong>Doctor / Practitioner</strong></td><td>Time-constrained clinician, tech-moderate</td><td>Full patient history instantly, record consultation, control line</td><td>Cannot recall last medications without hunting paper files</td></tr>
+            <tr><td><strong>Clinic Admin / Owner</strong></td><td>Business operator, tracks clinic performance</td><td>Live revenue, patients, wait-time metrics</td><td>No real-time visibility; relies on verbal staff updates</td></tr>
+            <tr><td><strong>Patient</strong></td><td>Age 18–70, smartphone user, 1–6 visits/year</td><td>Book, track queue, get notified, view bills</td><td>Long unpredictable waits; no digital receipts</td></tr>
+          </tbody>
+        </table>
+
+        <h3>2.2 Secondary Users</h3>
+        <ul>
+          <li>Lab Technicians — receive lab orders, push patient back to queue after test</li>
+          <li>Accountants / Managers — export financial reports and compliance audits</li>
+          <li>Pharmacists — view and print prescriptions dispensed at clinic</li>
+        </ul>
+
+        <h3>2.3 Environment &amp; Constraints</h3>
+        <ul>
+          <li>Single or multi-doctor clinics (MVP: single doctor; v2: multi-doctor)</li>
+          <li>Low training tolerance — core actions must complete in ≤ 3 taps</li>
+          <li>Connectivity may be intermittent — offline resilience desirable for critical flows</li>
+          <li>Primary devices: staff on desktop/tablet, doctors on tablet, patients on mobile</li>
+          <li>India-first deployment: supports INR, GST, DLT-registered SMS, DPDP Act 2023 compliance</li>
+        </ul>
+
+        <h2 id="prd-s3">3. Complete Site Map (26 Pages)</h2>
+        <p>Every page lists purpose, key UI components, user roles, and priority.</p>
+
+        <h3>3.1 Public / Marketing</h3>
+        <table>
+          <thead><tr><th>Page</th><th>Name</th><th>Priority</th><th>Key Notes</th></tr></thead>
+          <tbody>
+            <tr><td>P-1</td><td>Landing / Home</td><td><span class="badge badge-gold">Should-have</span></td><td>Hero, feature cards, role CTAs, pricing, testimonials</td></tr>
+            <tr><td>P-2</td><td>Services (public list)</td><td><span class="badge badge-gold">Should-have</span></td><td>Service cards with icon/price/duration, Book Now CTA</td></tr>
+            <tr><td>P-3</td><td>Pricing / Plans (SaaS)</td><td><span class="badge badge-gold">Should-have</span></td><td>SaaS tiers with feature comparison and FAQ accordion</td></tr>
+            <tr><td>P-4</td><td>Login / Signup / OTP</td><td><span class="badge badge-red">Must-have</span></td><td>Role selector, email+password, OTP, forgot-password, Google SSO (Phase 2)</td></tr>
+            <tr><td>P-5</td><td>Forgot Password / Reset</td><td><span class="badge badge-red">Must-have</span></td><td>Self-service reset via OTP verification</td></tr>
+            <tr><td>P-6</td><td>Help / FAQ / Contact</td><td><span class="badge badge-gold">Should-have</span></td><td>Searchable FAQ, tutorial videos, live chat widget</td></tr>
+          </tbody>
+        </table>
+
+        <h3>3.2 Patient Portal (/patient/)</h3>
+        <table>
+          <thead><tr><th>Page</th><th>Name</th><th>Priority</th><th>Key Notes</th></tr></thead>
+          <tbody>
+            <tr><td>PT-1</td><td>Patient Dashboard</td><td><span class="badge badge-red">Must-have</span></td><td>Upcoming appointment, active token + ETA countdown, recent invoices</td></tr>
+            <tr><td>PT-2</td><td>Book Appointment</td><td><span class="badge badge-red">Must-have</span></td><td>Service selector, doctor cards, calendar picker, conflict detection</td></tr>
+            <tr><td>PT-3</td><td>Live Queue Tracker</td><td><span class="badge badge-red">Must-have</span></td><td>Token position, ETA countdown, WebSocket updates, sharable link</td></tr>
+            <tr><td>PT-4</td><td>Visit History / Records</td><td><span class="badge badge-red">Must-have</span></td><td>Timeline view, prescription PDF download, lab result viewer</td></tr>
+            <tr><td>PT-5</td><td>Bills &amp; Payments</td><td><span class="badge badge-red">Must-have</span></td><td>Bill list with status badges, online payment (Razorpay), receipt download</td></tr>
+            <tr><td>PT-6</td><td>Profile &amp; Preferences</td><td><span class="badge badge-red">Must-have</span></td><td>Personal info, messaging consent per channel, language preference</td></tr>
+            <tr><td>PT-7</td><td>Notifications Log</td><td><span class="badge badge-gold">Should-have</span></td><td>Message history with channel icon, timestamp, delivery status</td></tr>
+          </tbody>
+        </table>
+
+        <h3>3.3 Staff / Reception Portal (/staff/)</h3>
+        <table>
+          <thead><tr><th>Page</th><th>Name</th><th>Priority</th><th>Key Notes</th></tr></thead>
+          <tbody>
+            <tr><td>ST-1</td><td>Reception Dashboard</td><td><span class="badge badge-red">Must-have</span></td><td>Phone lookup autofocus, New Patient button, today's appointments, queue summary</td></tr>
+            <tr><td>ST-2</td><td>Patient Detail (staff)</td><td><span class="badge badge-red">Must-have</span></td><td>Demographics, last visit notes, outstanding balance, quick actions</td></tr>
+            <tr><td>ST-3</td><td>Queue Management Console</td><td><span class="badge badge-red">Must-have</span></td><td>Draggable queue rows, action icon bar, real-time WebSocket, 10s undo</td></tr>
+            <tr><td>ST-4</td><td>Billing &amp; Payments</td><td><span class="badge badge-red">Must-have</span></td><td>Service line-item selector, tax auto-calc, multi-payment method, receipt</td></tr>
+            <tr><td>ST-5</td><td>Messaging Templates &amp; Logs</td><td><span class="badge badge-gold">Should-have</span></td><td>Template editor, consent/opt-out list, delivery logs</td></tr>
+            <tr><td>ST-6</td><td>Patient Directory</td><td><span class="badge badge-gold">Should-have</span></td><td>Search by name/phone/ID, filter, result table with quick-actions</td></tr>
+          </tbody>
+        </table>
+
+        <h3>3.4 Doctor Portal (/doctor/)</h3>
+        <table>
+          <thead><tr><th>Page</th><th>Name</th><th>Priority</th><th>Key Notes</th></tr></thead>
+          <tbody>
+            <tr><td>D-1</td><td>Doctor Dashboard</td><td><span class="badge badge-red">Must-have</span></td><td>Current patient card, queue preview, status toggle (available/on lunch/on break)</td></tr>
+            <tr><td>D-2</td><td>Consultation / EHR Page</td><td><span class="badge badge-red">Must-have</span></td><td>Structured form: vitals, diagnosis, prescription builder, lab orders, autosave</td></tr>
+            <tr><td>D-3</td><td>Patient Timeline (doctor)</td><td><span class="badge badge-red">Must-have</span></td><td>Longitudinal view, prescription history, lab results, keyword search</td></tr>
+            <tr><td>D-4</td><td>Schedule / Availability</td><td><span class="badge badge-gold">Should-have</span></td><td>Weekly schedule grid, break slots, avg consult time, Google/Outlook sync</td></tr>
+          </tbody>
+        </table>
+
+        <h3>3.5 Admin Portal (/admin/)</h3>
+        <table>
+          <thead><tr><th>Page</th><th>Name</th><th>Priority</th><th>Key Notes</th></tr></thead>
+          <tbody>
+            <tr><td>A-1</td><td>Admin Overview Dashboard</td><td><span class="badge badge-red">Must-have</span></td><td>Real-time KPIs: revenue, avg wait, token throughput, queue health RAG</td></tr>
+            <tr><td>A-2</td><td>Reports &amp; Exports</td><td><span class="badge badge-gold">Should-have</span></td><td>Financial/operational/compliance, date range, export CSV/PDF, scheduled email</td></tr>
+            <tr><td>A-3</td><td>Users &amp; Roles</td><td><span class="badge badge-red">Must-have</span></td><td>Invite by email/phone, role selector, permission matrix, audit log</td></tr>
+            <tr><td>A-4</td><td>Services &amp; Pricing</td><td><span class="badge badge-gold">Should-have</span></td><td>CRUD for clinic services, active/inactive toggle, bulk price update</td></tr>
+            <tr><td>A-5</td><td>Integrations &amp; Settings</td><td><span class="badge badge-red">Must-have</span></td><td>WhatsApp config, SMS, SMTP, payment keys, tax rules, token numbering</td></tr>
+            <tr><td>A-6</td><td>Audit Logs &amp; Data Retention</td><td><span class="badge badge-gold">Should-have</span></td><td>Immutable log table with filters, CSV export, retention policy settings</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="prd-s4">4. Feature Overview (25 Features)</h2>
+        <table>
+          <thead><tr><th>#</th><th>Feature</th><th>Priority</th><th>Module</th></tr></thead>
+          <tbody>
+            <tr><td>F1</td><td>Smart Patient Entry — Phone Lookup &amp; Quick Registration</td><td><span class="badge badge-red">Must-have</span></td><td>Staff / All</td></tr>
+            <tr><td>F2</td><td>Queue &amp; Token Management — Live Line Tracking</td><td><span class="badge badge-red">Must-have</span></td><td>Staff / Doctor</td></tr>
+            <tr><td>F3</td><td>Messaging Automation — WhatsApp / SMS / Email Triggers</td><td><span class="badge badge-red">Must-have</span></td><td>System</td></tr>
+            <tr><td>F4</td><td>Visit / EHR Persistence — Doctor Remembers Everything</td><td><span class="badge badge-red">Must-have</span></td><td>Doctor</td></tr>
+            <tr><td>F5</td><td>One-Tap Operational Controls — Pause, Lab, Emergency</td><td><span class="badge badge-red">Must-have</span></td><td>Doctor / Staff</td></tr>
+            <tr><td>F6</td><td>Billing &amp; Digital Receipts</td><td><span class="badge badge-red">Must-have</span></td><td>Staff</td></tr>
+            <tr><td>F7</td><td>Clinic Statistics &amp; Analytics Dashboard</td><td><span class="badge badge-red">Must-have</span></td><td>Admin / Staff</td></tr>
+            <tr><td>F8</td><td>Appointment Booking &amp; Calendar Integration</td><td><span class="badge badge-gold">Should-have</span></td><td>Patient / Staff</td></tr>
+            <tr><td>F9</td><td>Messaging Template Editor &amp; Consent Management</td><td><span class="badge badge-gold">Should-have</span></td><td>Admin</td></tr>
+            <tr><td>F10</td><td>Global Search &amp; Patient Directory</td><td><span class="badge badge-gold">Should-have</span></td><td>Staff / Doctor</td></tr>
+            <tr><td>F11</td><td>Audit Logs &amp; Compliance (Security)</td><td><span class="badge badge-red">Must-have</span></td><td>Admin / System</td></tr>
+            <tr><td>F12</td><td>Reports &amp; Exports (Financial + Operational)</td><td><span class="badge badge-gold">Should-have</span></td><td>Admin</td></tr>
+            <tr><td>F13</td><td>Role-based Access Control (RBAC)</td><td><span class="badge badge-red">Must-have</span></td><td>System / Admin</td></tr>
+            <tr><td>F14</td><td>Payments &amp; Refunds Integration</td><td><span class="badge badge-gold">Should-have</span></td><td>Patient / Staff</td></tr>
+            <tr><td>F15</td><td>Lab Orders &amp; Results Integration</td><td><span class="badge badge-gold">Should-have</span></td><td>Doctor / Staff</td></tr>
+            <tr><td>F16</td><td>Multi-clinic / Multi-location Support</td><td><span class="badge badge-muted">Nice-to-have</span></td><td>Admin</td></tr>
+            <tr><td>F17</td><td>Offline Resilience &amp; Background Sync</td><td><span class="badge badge-muted">Nice-to-have</span></td><td>All</td></tr>
+            <tr><td>F18</td><td>Kiosk Mode &amp; Token Display Board</td><td><span class="badge badge-muted">Nice-to-have</span></td><td>Staff</td></tr>
+            <tr><td>F19</td><td>Telemedicine / Video Consult</td><td><span class="badge badge-muted">Nice-to-have</span></td><td>Doctor / Patient</td></tr>
+            <tr><td>F20</td><td>Prescription Template Library</td><td><span class="badge badge-gold">Should-have</span></td><td>Doctor</td></tr>
+            <tr><td>F21</td><td>Patient QR Self-Check-in</td><td><span class="badge badge-gold">Should-have</span></td><td>Patient / Staff</td></tr>
+            <tr><td>F22</td><td>Staff Shift Handover &amp; Clinic Notes</td><td><span class="badge badge-gold">Should-have</span></td><td>Staff</td></tr>
+            <tr><td>F23</td><td>Patient Referral Tracking</td><td><span class="badge badge-gold">Should-have</span></td><td>Doctor</td></tr>
+            <tr><td>F24</td><td>Two-Factor Authentication (2FA)</td><td><span class="badge badge-red">Must-have</span></td><td>System / Auth</td></tr>
+            <tr><td>F25</td><td>API Rate Limiting &amp; Abuse Prevention</td><td><span class="badge badge-red">Must-have</span></td><td>System / DevOps</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="prd-s5">5. Must-Have Features (F1–F7)</h2>
+        <p>All P0 features required in Phase 1 MVP. Each includes description, interaction flow, technical requirements, and success criteria.</p>
+
+        <h3>F1 — Smart Patient Entry: Phone Lookup &amp; Quick Registration</h3>
+        <p>Receptionist types a phone number → instant lookup. Returning patients auto-fill in &lt;1s. New patients get a minimal quick-create form. The entire check-in experience hinges on this feature.</p>
+        <h4>Technical Requirements</h4>
+        <ul>
+          <li>Indexed DB search on phone field; API POST /api/patients/lookup returns match in ≤500ms</li>
+          <li>Redis caching for recent lookups (last 500 phone lookups per clinic per day)</li>
+          <li>Phone normalization: strip country codes, whitespace, dashes before lookup</li>
+          <li>Fuzzy match for common formatting variations; unique constraint on normalized phone + clinic_id</li>
+          <li>Idempotent create path: upsert pattern prevents duplicate creation on double-submit</li>
+          <li>Consent capture at creation: opt_in_messaging boolean + consent_timestamp + source</li>
+        </ul>
+        <h4>Success Criteria</h4>
+        <ul>
+          <li>≥90% of returning patients auto-identified within 1 second of phone entry</li>
+          <li>Lookup API P50 &lt;500ms; P99 &lt;1 second under load</li>
+          <li>Time from phone entry to token issued: &lt;30s for new patient; &lt;20s for returning</li>
+          <li>Zero duplicate patient records under concurrent registration attempts</li>
+        </ul>
+
+        <h3>F2 — Queue &amp; Token Management: Live Line Tracking</h3>
+        <p>Tokens created for walk-ins and appointments, displayed on an interactive real-time queue board visible across all connected devices. Supports multi-doctor queues and service-based queues.</p>
+        <h4>Technical Requirements</h4>
+        <ul>
+          <li>WebSocket (Socket.IO) for real-time sync — queue changes broadcast within 1 second</li>
+          <li>Persistent queue state in PostgreSQL + Redis hot cache</li>
+          <li>Optimistic locking + DB transactions for reorder and status changes</li>
+          <li>ETA engine: moving average of last 10 consult durations per doctor; configurable floor/ceiling</li>
+          <li>Audit log entry for every token status change and reorder</li>
+          <li>Multi-tenant: queues fully isolated per clinic</li>
+        </ul>
+
+        <h3>F3 — Messaging Automation: WhatsApp / SMS / Email Triggers</h3>
+        <p>Fully configurable templates with event-driven triggers. Core triggers: token issued, two-patients-before reminder, your-turn, queue pause/resume, bill sent, appointment confirmed/reminder, lab return.</p>
+        <h4>Technical Requirements</h4>
+        <ul>
+          <li>Integration with Meta WhatsApp Business API or Twilio; abstraction layer for provider switch</li>
+          <li>Message broker (RabbitMQ or AWS SQS) with exponential back-off retry (3 attempts) and DLQ</li>
+          <li>Provider webhook endpoint to receive delivery receipts and update MessageLog</li>
+          <li>Template engine: variable substitution, conditional blocks, Unicode support</li>
+          <li>Throttling and cost controls: daily message cap per patient (configurable)</li>
+          <li>SMS DLT registration (India): all SMS templates pre-registered</li>
+        </ul>
+        <h4>Success Criteria</h4>
+        <ul>
+          <li>Message send success rate ≥95% across provider delivery reports</li>
+          <li>Trigger-to-send latency P50 &lt;10 seconds; P95 &lt;30 seconds</li>
+          <li>100% of sends respect opt-out (zero messages sent to opted-out patients)</li>
+        </ul>
+
+        <h3>F4 — Visit / EHR Persistence: Doctor Remembers Everything</h3>
+        <p>Complete structured EHR for each consultation: complaint, vitals, diagnosis, investigations, prescriptions with dosage details, follow-up instructions, file attachments, and billing linkage. Fully auditable.</p>
+        <h4>Technical Requirements</h4>
+        <ul>
+          <li>Normalized data model: Visit → Prescription[], TestOrder[], Attachment[]</li>
+          <li>WYSIWYG/structured form with autosave every 30 seconds; versioned edits</li>
+          <li>Attachments stored in S3-compatible storage (encrypted); access via pre-signed URLs with 24h expiry</li>
+          <li>Audit trail: every save records (user_id, timestamp, JSON diff)</li>
+          <li>Full-text search across complaint, diagnosis, and notes fields (Postgres tsvector)</li>
+          <li>PDF export: printable prescription with clinic letterhead, doctor signature, QR to digital record</li>
+        </ul>
+        <h4>Success Criteria</h4>
+        <ul>
+          <li>Doctor retrieves full patient history within ≤5 seconds for 95% of requests</li>
+          <li>100% of visits saved with complete audit metadata</li>
+          <li>Zero data loss on autosave (validated by disconnection test scenarios)</li>
+        </ul>
+
+        <h3>F5 — One-Tap Operational Controls: Pause, Lab, Emergency, Bring-back</h3>
+        <p>Single-click controls for managing operational irregularities: pausing the queue, sending a patient for lab tests, bringing them back with priority, and emergency push-to-front. Each action is atomic, auditable, and can trigger a patient notification.</p>
+
+        <h3>F6 — Billing &amp; Digital Receipts</h3>
+        <p>Create and manage itemized bills linked to a visit. Supports configurable tax rules (GST), discounts, multiple payment modes, partial payments, refunds, and generates a branded PDF receipt. Receipts sent automatically via messaging engine.</p>
+        <h4>Success Criteria</h4>
+        <ul>
+          <li>Bill creation (open form → PDF generated): &lt;2 minutes end-to-end</li>
+          <li>Receipts sent for 100% of bills where patient has opted in for messaging</li>
+          <li>PDF generation ≤5 seconds for standard bills (&lt;20 line items)</li>
+          <li>Payment reconciliation accuracy 100% (invoice total = sum of payments recorded)</li>
+        </ul>
+
+        <h3>F7 — Clinic Statistics &amp; Analytics Dashboard</h3>
+        <p>Real-time and historical KPIs: patients today, revenue, average wait time, token throughput, no-shows, top complaints/services, doctor utilisation, and message delivery stats. Interactive visualizations with date/doctor filters, drilldowns, and scheduled exports.</p>
+
+        <h2 id="prd-s6">6. Should-Have Features (F8–F13)</h2>
+
+        <h3>F8 — Appointment Booking &amp; Calendar Integration</h3>
+        <p>Patients book appointments online by selecting service, doctor, and available time slot. System prevents double-booking, sends confirmation and reminder notifications, and optionally syncs to external calendars (Google / Outlook). Slot holds via Redis TTL (5 minutes).</p>
+
+        <h3>F9 — Messaging Template Editor &amp; Consent Management</h3>
+        <p>Admin and staff can create, edit, test, and version message templates for all channels. Consent management provides full view of patient opt-in/opt-out status per channel, with bulk tools fully integrated with messaging engine.</p>
+
+        <h3>F10 — Global Search &amp; Patient Directory</h3>
+        <p>Global search across patients, visits, bills, tokens, and appointments. Supports searching by phone, name, token number, bill ID, and free-text in notes (with PHI access controls). Search latency P50 &lt;300ms; P99 &lt;800ms.</p>
+
+        <h3>F11 — Audit Logs &amp; Compliance</h3>
+        <p>Immutable append-only log of all critical system actions. Supports compliance exports and forensic investigation. 100% of defined critical actions produce an audit entry (validated by integration tests).</p>
+
+        <h3>F12 — Reports &amp; Financial Exports</h3>
+        <p>Generate financial, operational, and compliance reports with date/doctor/service filters. Viewable in-app and exportable as PDF or CSV. Scheduled report delivery by email on weekly or monthly cadence.</p>
+
+        <h3>F13 — Role-Based Access Control (RBAC)</h3>
+        <p>Comprehensive permission system enforced at API layer and UI layer. RBAC matrix: role × resource × action (create/read/update/delete/admin). JWT claims carry role; role changes invalidate existing JWT within 5 minutes via Redis-backed token blocklist.</p>
+
+        <h2 id="prd-s7">7. Additional Features (F14–F19)</h2>
+
+        <h3>F14 — Payments &amp; Refunds Integration</h3>
+        <p>Online payments for appointment booking and bill settlement via Razorpay / Stripe. Handles webhook confirmation, generates receipts, supports partial payments and refunds. PCI-DSS compliance via gateway tokenization.</p>
+
+        <h3>F15 — Lab Orders &amp; Results Integration</h3>
+        <p>Create lab orders from consultation UI, track sample status, and attach results to the patient's visit record. Supports integrated labs (HL7/FHIR API) and manual result upload for non-integrated labs.</p>
+
+        <h3>F16 — Multi-clinic / Multi-location Support</h3>
+        <p>Single admin account manages multiple clinic branches with shared staff (optional), per-location reporting, and centralized billing. Each branch has its own queue, patients, and services while sharing global configuration.</p>
+
+        <h3>F17 — Offline Resilience &amp; Background Sync</h3>
+        <p>Critical operations continue briefly during poor connectivity: patient lookup from cache, new token creation (queued locally via IndexedDB), and visit note drafting. Background sync resumes once connectivity returns with conflict resolution.</p>
+
+        <h3>F18 — Kiosk Mode &amp; In-Clinic Token Display</h3>
+        <p>Public-facing display (TV or tablet) shows current token being served, next tokens, estimated wait times, and clinic notice board. Optionally supports self-service token printing for walk-in patients.</p>
+
+        <h3>F19 — Telemedicine / Video Consult</h3>
+        <p>Host secure video consultations integrated into the doctor workflow. WebRTC via Twilio Video SDK or self-hosted Jitsi. EHR and billing flows remain identical to in-person visits.</p>
+
+        <h2 id="prd-s8">8. Additional Features — New Additions (F20–F25)</h2>
+        <p>Six features absent from reference PRDs but considered important for a complete, production-grade clinic platform.</p>
+
+        <h3>F20 — Prescription Template Library (Doctor Quick-Rx)</h3>
+        <p>Doctors save common prescriptions as named templates. During consultation, select a template to instantly populate the entire prescription block. Dramatically reduces consultation time for routine cases.</p>
+
+        <h3>F21 — Patient QR Self-Check-in</h3>
+        <p>Returning patients scan a QR code at clinic entrance to check in and join queue without waiting for staff. QR encodes a short-lived signed URL (clinic_id + date + HMAC signature; 24h validity). Anti-abuse: rate-limit per IP (max 10 check-ins per IP per hour).</p>
+
+        <h3>F22 — Staff Shift Handover &amp; Clinic Daily Notes</h3>
+        <p>Structured daily shift log allows staff to record important notes at start and end of each shift — pending tasks, patient escalations, cash balance, equipment issues. Prevents information loss between shifts.</p>
+
+        <h3>F23 — Patient Referral Tracking</h3>
+        <p>Doctors can refer a patient to another doctor or specialist. Referral recorded in patient's visit, receiving doctor notified, and outcome logged when patient returns. Closes the clinical loop and builds a richer patient record.</p>
+
+        <h3>F24 — Two-Factor Authentication (2FA)</h3>
+        <p>All staff, doctor, and admin accounts require 2FA. TOTP (RFC 6238) support as alternative to SMS OTP. OTP stored as HMAC hash (not plaintext); expires after 5 minutes; single-use. Brute force protection: OTP locked after 5 failed attempts; 15-minute cooldown.</p>
+
+        <h3>F25 — API Rate Limiting &amp; Abuse Prevention</h3>
+        <p>Protect all API endpoints against abuse, brute-force attacks, and bot traffic. Rate limiting via Redis sliding window counters per IP, per user, and per API key. DDoS mitigation at infrastructure level (Cloudflare WAF or AWS Shield).</p>
+
+        <h2 id="prd-s9">9. Data Model (Entity Reference)</h2>
+        <p>All tables use UUID primary keys. Every patient-facing record is scoped to clinic_id (multi-tenant). Soft delete only. Timestamps in UTC stored as TIMESTAMPTZ.</p>
+        <table>
+          <thead><tr><th>Entity</th><th>Key Fields</th><th>Primary Relationships</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Patient</strong></td><td>patient_id, phone (unique/clinic), name, dob, gender, email, opt_in_messaging, consent_timestamp, clinic_id</td><td>→ Visit[], Token[], Bill[], MessageLog[]</td><td>Phone is primary lookup key; normalized on write</td></tr>
+            <tr><td><strong>Visit</strong></td><td>visit_id, patient_id, doctor_id, clinic_id, visit_date, start/end_time, complaint, complaint_tags[], diagnosis, notes (private), prescriptions JSONB, tests_ordered[], attachments[], follow_up_date, bill_id</td><td>Patient, Doctor, Clinic, Bill</td><td>autosave field: draft_notes; locked after Save &amp; Sign</td></tr>
+            <tr><td><strong>Token / QueueItem</strong></td><td>token_id, token_number (daily sequence), patient_id, doctor_id, queue_type ENUM, status ENUM, queue_position, estimated_wait_mins, issued_at, called_at, served_at</td><td>Patient, Doctor, Visit (nullable)</td><td>Persisted in DB + Redis; rebuilt from DB on restart</td></tr>
+            <tr><td><strong>Appointment</strong></td><td>appointment_id, patient_id, doctor_id, service_id, scheduled_time, status ENUM, source ENUM, notes</td><td>Patient, Doctor, Service</td><td>Slot reservation TTL handled in Redis; conflict by unique index</td></tr>
+            <tr><td><strong>Doctor</strong></td><td>doctor_id, clinic_id, name, specialization, avg_consult_mins, schedule JSONB, status ENUM, calendar_sync_token</td><td>Clinic, Visit[], Token[]</td><td>avg_consult_mins auto-calibrates from last 10 visits</td></tr>
+            <tr><td><strong>Bill / Invoice</strong></td><td>bill_id, visit_id, patient_id, items JSONB, subtotal, tax_amount, discount_amount, total_amount, payment_status ENUM, sent_via[], receipt_url, paid_at</td><td>Visit, Patient</td><td>Idempotent: unique constraint on visit_id</td></tr>
+            <tr><td><strong>MessageLog</strong></td><td>message_id, patient_id, to_contact, channel ENUM, template_id, variables JSONB, status ENUM, provider_message_id, provider_response JSONB, sent_at, delivered_at</td><td>Patient</td><td>Append-only; delivery status updated by provider webhook</td></tr>
+            <tr><td><strong>AuditLog</strong></td><td>log_id, user_id, session_id, ip_address, action, resource_type, resource_id, before_snapshot JSONB, after_snapshot JSONB, timestamp</td><td>User (all roles)</td><td>Append-only; cryptographic signing optional</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="prd-s10">10. API Reference (REST / JSON)</h2>
+        <p>Authentication: JWT Bearer token on all routes except /api/auth/*. Multi-tenant: clinic_id extracted from JWT claims — never passed by client.</p>
+
+        <h4>Patient APIs</h4>
+        <pre><code>POST /api/auth/otp/request      // Request OTP for patient login
+POST /api/auth/otp/verify       // Verify OTP → return JWT
+POST /api/auth/login            // Staff/Doctor/Admin email+password → JWT
+POST /api/patients/lookup       // { phone } → PatientObject | 404
+POST /api/patients              // { phone, name?, dob?, gender?, email? } → 201
+GET  /api/patients/:id          // { patient, visits, tokens, bills }
+PATCH /api/patients/:id         // 200: { patient }
+GET  /api/patients              // Directory: ?name=&phone=&page=1&limit=20</code></pre>
+
+        <h4>Queue / Token APIs</h4>
+        <pre><code>POST /api/queues                 // { patient_id, doctor_id?, service_id?, source }
+GET  /api/queues                 // ?status=waiting&doctor_id=xxx&date=
+PATCH /api/queues/:id/status     // { status: 'now'|'paused_lab'|'served'|'cancelled' }
+POST /api/queues/emergency       // { patient_id, doctor_id }
+POST /api/queues/pause           // { send_notification: true }
+POST /api/queues/resume
+POST /api/queues/:id/lab         // { tests: ['CBC','LFT'], expected_return_mins: 30 }
+POST /api/queues/:id/return      // { position: 'next'|'front' }
+POST /api/queues/:id/undo        // Undo last action within 10s window</code></pre>
+
+        <h4>Visit / EHR APIs</h4>
+        <pre><code>POST /api/visits                 // { patient_id, doctor_id, complaint, prescriptions, ... }
+GET  /api/visits                 // ?patient_id=&from=&to=&keyword=
+PATCH /api/visits/:id            // Amend notes; creates audit diff
+POST /api/visits/:id/attachments // multipart/form-data → presigned URL
+GET  /api/prescription-templates
+POST /api/prescription-templates
+POST /api/referrals              // { visit_id, receiving_doctor_id?, reason, urgency }</code></pre>
+
+        <h4>Billing APIs</h4>
+        <pre><code>POST /api/bills                  // { visit_id, items, discount_amount? }
+GET  /api/bills/:id
+PATCH /api/bills/:id/payment     // { amount_paid, payment_method, reference_id? }
+POST /api/bills/:id/refund       // { amount, reason }</code></pre>
+
+        <h4>Analytics &amp; Admin APIs</h4>
+        <pre><code>GET /api/clinic/stats            // ?from=&to=&doctor_id=&export=csv|pdf
+GET /api/reports/financial       // ?from=&to=&format=pdf|csv
+GET /api/reports/operational     // ?from=&to=
+GET /api/audit-logs              // ?action=&user_id=&from=&to=&page=
+GET /api/shift-logs              // ?date=&clinic_id=
+POST /api/shift-logs</code></pre>
+
+        <h2 id="prd-s11">11. Messaging Templates</h2>
+        <table>
+          <thead><tr><th>Template Key</th><th>Trigger</th><th>Channel</th><th>Sample Message</th></tr></thead>
+          <tbody>
+            <tr><td><code>token_issued</code></td><td>On queue entry</td><td>WA + SMS</td><td>Hi {patient_name}, your token at {clinic_name} is #{token_no}. Est. wait: {est_wait} mins.</td></tr>
+            <tr><td><code>two_before</code></td><td>Queue position = current+2</td><td>WA + SMS</td><td>Hi {patient_name} 👋 Only 2 patients ahead of you at {clinic_name}. Please make your way in soon!</td></tr>
+            <tr><td><code>your_turn</code></td><td>Token status → 'now'</td><td>WA + SMS</td><td>🔔 Hi {patient_name}, it's YOUR TURN at {clinic_name}! Token #{token_no} — please come right now.</td></tr>
+            <tr><td><code>queue_paused</code></td><td>Doctor taps Pause</td><td>WA</td><td>Hi {patient_name}, the doctor at {clinic_name} is on a short break (~{break_duration} min).</td></tr>
+            <tr><td><code>queue_resumed</code></td><td>Doctor taps Resume</td><td>WA</td><td>Hi {patient_name}, good news — the queue at {clinic_name} has resumed! Updated wait: ~{est_wait} min.</td></tr>
+            <tr><td><code>bill_receipt</code></td><td>Bill generated + paid</td><td>WA + Email</td><td>✅ Thank you {patient_name}. Your bill of ₹{amount} at {clinic_name} is ready. Download: {receipt_link}</td></tr>
+            <tr><td><code>appt_confirmed</code></td><td>Appointment booked</td><td>WA + Email</td><td>Hi {patient_name} ✅ Your appointment with Dr. {doctor_name} at {clinic_name} is confirmed for {appointment_time}.</td></tr>
+            <tr><td><code>appt_reminder_24h</code></td><td>24h before appointment</td><td>WA + Email</td><td>⏰ Reminder: Your appointment at {clinic_name} with Dr. {doctor_name} is tomorrow at {appointment_time}.</td></tr>
+            <tr><td><code>lab_sent</code></td><td>Token sent to lab</td><td>WA</td><td>Hi {patient_name}, your place in the queue is saved! Please proceed to the lab for: {lab_tests}.</td></tr>
+            <tr><td><code>lab_return</code></td><td>Lab result received</td><td>WA</td><td>Hi {patient_name}, your lab results are in! Please return to the clinic — queue position: #{queue_position}.</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="prd-s12">12. Privacy &amp; Messaging Consent</h2>
+        <h3>Consent Capture Flow</h3>
+        <ul>
+          <li>Staff-side registration: consent checkbox shown (default: checked). Staff must explicitly uncheck to deny.</li>
+          <li>Patient portal signup: explicit checkbox for appointment and queue notifications.</li>
+          <li>Self-check-in QR: consent checkbox shown before token creation.</li>
+          <li>Consent version tracked: if privacy policy version changes, re-consent prompt triggered.</li>
+        </ul>
+        <h3>Data Privacy Requirements</h3>
+        <ul>
+          <li>PHI encrypted at rest: AES-256 for PostgreSQL column-level encryption on sensitive fields</li>
+          <li>Data in transit: TLS 1.3 minimum on all endpoints; HSTS with 1-year max-age; no HTTP fallback</li>
+          <li>Data retention: visit records ≥7 years; billing records ≥5 years; audit logs ≥5 years</li>
+          <li>Soft delete only: no hard deletion of patient, visit, or billing records</li>
+          <li>DPDP Act 2023 (India) compliance: explicit consent, purpose limitation, data minimization, right to correction</li>
+        </ul>
+
+        <h2 id="prd-s13">13. Success Metrics / KPIs</h2>
+        <table>
+          <thead><tr><th>Metric</th><th>Baseline</th><th>3-Month Target</th><th>6-Month Target</th></tr></thead>
+          <tbody>
+            <tr><td>Avg Patient Wait Time</td><td>45–90 min</td><td>&lt;40 min</td><td>&lt;25 min</td></tr>
+            <tr><td>Patient Check-in Time</td><td>5–8 min (paper)</td><td>&lt;45 sec</td><td>&lt;20 sec</td></tr>
+            <tr><td>WhatsApp Delivery Rate</td><td>0%</td><td>&gt;95%</td><td>&gt;98%</td></tr>
+            <tr><td>Returning Patient Recognition</td><td>Manual</td><td>≥90%</td><td>≥95%</td></tr>
+            <tr><td>Bill Generation Time</td><td>10–15 min</td><td>&lt;2 min</td><td>&lt;60 sec</td></tr>
+            <tr><td>Digital Receipt Adoption</td><td>0%</td><td>≥60%</td><td>≥80%</td></tr>
+            <tr><td>No-Show Rate</td><td>~25% (est.)</td><td>&lt;15%</td><td>&lt;10%</td></tr>
+            <tr><td>Token Throughput</td><td>Baseline</td><td>+15%</td><td>+30%</td></tr>
+            <tr><td>System Uptime</td><td>—</td><td>99.5% monthly</td><td>99.5% monthly</td></tr>
+            <tr><td>API Response Time (lookup)</td><td>—</td><td>P95 &lt;500ms</td><td>P95 &lt;500ms</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="prd-s14">14. Tech Stack Summary</h2>
+        <table>
+          <thead><tr><th>Layer</th><th>Technology</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Frontend</td><td>React + Next.js (App Router) + Tailwind CSS</td><td>SSR for SEO; PWA-ready; Tailwind for rapid consistent UI</td></tr>
+            <tr><td>State</td><td>Zustand + React Query (TanStack)</td><td>Lightweight global state; server state caching and background refetch</td></tr>
+            <tr><td>Real-time</td><td>Socket.IO (client + server)</td><td>Bi-directional WebSocket for live queue updates to all connected clients</td></tr>
+            <tr><td>Backend</td><td>Node.js + Express (or Fastify)</td><td>Async I/O; Fastify ~2× faster for high-throughput routes</td></tr>
+            <tr><td>Primary DB</td><td>PostgreSQL 15+</td><td>ACID transactions; JSONB for prescriptions; tsvector full-text search; RLS</td></tr>
+            <tr><td>Cache / Queue State</td><td>Redis 7</td><td>Hot queue cache; pub/sub for Socket.IO adapter; rate-limit counters</td></tr>
+            <tr><td>Message Broker</td><td>RabbitMQ (or AWS SQS)</td><td>Durable async message dispatch; exponential retry; dead-letter queue</td></tr>
+            <tr><td>File Storage</td><td>AWS S3 / Cloudflare R2</td><td>PDF receipts, prescriptions, lab reports; pre-signed URLs</td></tr>
+            <tr><td>PDF Generation</td><td>Puppeteer (headless Chrome)</td><td>Pixel-perfect branded PDFs from HTML/CSS templates</td></tr>
+            <tr><td>WhatsApp</td><td>Meta WhatsApp Business API / Twilio sandbox</td><td>Primary notification channel; Twilio for MVP testing</td></tr>
+            <tr><td>Auth</td><td>JWT (access 15min) + Refresh Token (30d) + OTP</td><td>Stateless API auth; refresh rotation; Redis token blocklist for revocation</td></tr>
+            <tr><td>Monitoring</td><td>Sentry + BetterStack</td><td>Error tracking with source maps; uptime monitoring; structured logs</td></tr>
+            <tr><td>CI/CD</td><td>GitHub Actions → Railway (MVP) → AWS ECS (prod)</td><td>Fast deploy pipeline; Railway for speed-to-market; ECS for production autoscaling</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="prd-s15">15. Acceptance Tests</h2>
+        <p>Format: Given / When / Then. Full E2E test suite to be authored in Playwright; unit/integration tests in Jest/Vitest.</p>
+        <table>
+          <thead><tr><th>Test</th><th>Given</th><th>When</th><th>Then</th></tr></thead>
+          <tbody>
+            <tr><td><strong>AT-01</strong><br>Returning Patient Lookup</td><td>Patient with phone +919876543210 exists with 3 previous visits</td><td>Receptionist enters '+919876543210' in lookup field</td><td>Patient name, last visit, visit count appear within 2s. One additional click to add to queue. Active token check prevents duplicate.</td></tr>
+            <tr><td><strong>AT-02</strong><br>New Patient Registration</td><td>No patient with phone +919000000001 exists</td><td>Receptionist enters phone → clicks Create (name left blank)</td><td>Patient created; token #1 auto-assigned; WhatsApp message queued within 15s. opt_in_messaging = true and consent_timestamp set.</td></tr>
+            <tr><td><strong>AT-03</strong><br>Queue Notifications Chain</td><td>3 patients in queue. New patient P4 joins.</td><td>Token issued to P4 (position 4)</td><td>P4 gets 'token_issued' WhatsApp within 15s. As queue advances, P3 gets 'two_before'. When P2 served: P3 gets 'your_turn'. All ETAs update within 1s.</td></tr>
+            <tr><td><strong>AT-04</strong><br>Emergency Push-to-Front</td><td>4 patients in queue. PE arrives as emergency.</td><td>Staff taps Emergency and confirms</td><td>PE inserted at position 1 within 1 second. All 4 patients receive ETA update. Doctor receives Socket.IO alert. Action logged in audit trail.</td></tr>
+            <tr><td><strong>AT-05</strong><br>Doctor Visit Save &amp; History</td><td>Doctor has patient P1 open (2 previous visits visible)</td><td>Doctor saves complaint='high fever 3 days', diagnosis='viral fever', prescription=[Paracetamol 500mg TDS 5 days]</td><td>Visit created with audit metadata. On P1's next visit, doctor sees correct medicine in history panel.</td></tr>
+            <tr><td><strong>AT-06</strong><br>Billing &amp; Receipt Delivery</td><td>Completed visit for patient P1</td><td>Staff creates bill [Consultation ₹300, Medicine ₹150] with 18% GST</td><td>Total = ₹531. PDF generated within 5s. WhatsApp and email with receipt link sent within 15s. P1 can download PDF from portal anytime.</td></tr>
+            <tr><td><strong>AT-07</strong><br>Queue Pause &amp; Resume</td><td>5 patients waiting; P4 at position 4</td><td>Doctor taps 'Pause Queue'</td><td>All ETAs frozen within 2s. Next 3 patients receive 'queue_paused' WhatsApp. On Resume: ETAs recalculate from current time. P4's ETA reflects correct remaining wait.</td></tr>
+            <tr><td><strong>AT-08</strong><br>QR Self-Check-in (F21)</td><td>Clinic QR code displayed at reception</td><td>Patient scans QR → enters +919123456789 → taps Confirm</td><td>Token issued within 30s. Patient receives 'token_issued' WhatsApp. Staff dashboard shows 'Self-checked-in' badge. Duplicate check: second scan shows existing active token.</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="prd-s16">16. Developer Handoff Checklist</h2>
+        <p>All items must be signed off before development sprints begin. Items marked ★ are blocking for Phase 1 start.</p>
+        <h4>Design &amp; Architecture ★</h4>
+        <ul>
+          <li>★ Finalized ER diagram with all entities, FKs, indexes, and RLS policies</li>
+          <li>★ DB migration scripts (initial schema + seed data for dev/staging/test)</li>
+          <li>★ OpenAPI 3.1 spec for every endpoint</li>
+          <li>★ UI wireframes: Reception Dashboard, Queue Console, Doctor Consultation, Patient Lookup, Admin Stats</li>
+          <li>Design system: color tokens, typography scale, spacing scale, component library</li>
+          <li>Mobile-responsive breakpoints defined for all critical screens (320px, 768px, 1280px)</li>
+        </ul>
+        <h4>Messaging &amp; Integrations ★</h4>
+        <ul>
+          <li>★ WhatsApp Business API provider selected; account created; number verified</li>
+          <li>★ SMS provider selected (MSG91 for India); DLT entity registration initiated (4–6 week process)</li>
+          <li>★ All 12 message templates finalized and tested via sandbox</li>
+          <li>★ Opt-in consent flow reviewed by legal; consent language approved</li>
+        </ul>
+        <h4>Security &amp; Compliance ★</h4>
+        <ul>
+          <li>★ RBAC matrix documented: role × resource × action; reviewed by lead engineer</li>
+          <li>★ JWT secret rotation policy defined; refresh token expiry and revocation strategy confirmed</li>
+          <li>★ TLS 1.3 enforced; HSTS configured; CSP headers defined</li>
+          <li>DPDP Act 2023 compliance checklist reviewed with legal counsel</li>
+          <li>2FA enforcement policy defined: which roles require 2FA from day 1</li>
+        </ul>
+
+        <h2 id="prd-s17">17. Phased Roadmap</h2>
+
+        <h3>Phase 0 — Discovery &amp; Design (Weeks 1–2)</h3>
+        <p>Finalize ER diagram, DB schema, and migration scripts. Wireframes for Reception Dashboard, Queue Console, Doctor Consultation, Patient Lookup, Admin Stats. OpenAPI spec drafted. WhatsApp provider account live. DLT SMS registration initiated. Dev environment + CI/CD pipeline live.</p>
+
+        <h3>Phase 1 — MVP (Weeks 3–10)</h3>
+        <p>F1–F7 + Security Foundations: patient phone lookup, real-time token queue, WhatsApp/SMS automation, doctor consultation screen, one-tap controls, digital billing, admin stats dashboard, 2FA, RBAC on all routes, audit logs.</p>
+
+        <h3>Phase 2 — Stabilise (Weeks 11–16)</h3>
+        <p>F8–F13 + F20–F23: Online appointment booking, messaging template editor, global search, reports and financial exports, multi-doctor queues, prescription template library (F20), QR self-check-in (F21), shift handover notes (F22), patient referral tracking (F23), patient portal.</p>
+
+        <h3>Phase 3 — Growth (Weeks 17+)</h3>
+        <p>Online payments (F14), lab orders + HL7 FHIR (F15), multi-clinic admin panel (F16), mobile PWA offline (F17), kiosk mode (F18), telemedicine / video consult (F19), AI-powered prescription suggestions, ABHA integration, multi-language support.</p>
+
+        <h2 id="prd-s18">18. Non-Functional Requirements</h2>
+        <table>
+          <thead><tr><th>Category</th><th>Requirement</th><th>Target</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="5"><strong>Performance</strong></td><td>Patient phone lookup P95 latency</td><td>&lt;500ms (DB up to 100,000 patients)</td></tr>
+            <tr><td>Queue operations (create/update) P95</td><td>&lt;200ms; Socket.IO broadcast ≤1s</td></tr>
+            <tr><td>Page load (mobile, 4G)</td><td>&lt;2 seconds; Lighthouse score ≥75</td></tr>
+            <tr><td>WhatsApp send</td><td>Trigger → provider delivery ≤10s P50</td></tr>
+            <tr><td>PDF generation</td><td>≤5 seconds for standard bill</td></tr>
+            <tr><td rowspan="4"><strong>Security</strong></td><td>TLS version</td><td>TLS 1.3; HSTS max-age ≥1 year; no HTTP fallback</td></tr>
+            <tr><td>PHI encryption at rest</td><td>AES-256 column-level on DB; S3 server-side encryption</td></tr>
+            <tr><td>2FA</td><td>Enforced for all staff/doctor/admin accounts from day 1</td></tr>
+            <tr><td>Audit trail</td><td>All P0 mutations logged in immutable audit trail</td></tr>
+            <tr><td rowspan="4"><strong>Scalability</strong></td><td>Multi-tenant isolation</td><td>clinic_id scoping at ORM and DB level</td></tr>
+            <tr><td>Stateless API servers</td><td>Horizontal scaling supported behind load balancer</td></tr>
+            <tr><td>Concurrent sessions</td><td>200 concurrent staff/doctor sessions per clinic</td></tr>
+            <tr><td>Daily token volume</td><td>10,000 tokens/day</td></tr>
+            <tr><td rowspan="3"><strong>Accessibility</strong></td><td>WCAG compliance</td><td>WCAG 2.1 AA for all patient-facing and public pages</td></tr>
+            <tr><td>Mobile-first layout</td><td>Staff on tablet (768px), patients on phone (375px+)</td></tr>
+            <tr><td>Multi-language</td><td>English (MVP); Hindi + Gujarati (Phase 3) via i18next</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="prd-s19">19. Risks &amp; Mitigations</h2>
+        <table>
+          <thead><tr><th>Risk</th><th>Severity</th><th>Likelihood</th><th>Mitigation</th></tr></thead>
+          <tbody>
+            <tr><td>WhatsApp API approval delays (Meta)</td><td><span class="badge badge-red">High</span></td><td>High</td><td>Use Twilio WhatsApp sandbox for MVP; apply Meta direct API in parallel; SMS as primary MVP fallback</td></tr>
+            <tr><td>Doctor resistance to digital workflow</td><td><span class="badge badge-gold">Med</span></td><td>Med</td><td>Single-screen UI; max 3 taps for any core action; tablet-optimised; 5-minute onboarding video</td></tr>
+            <tr><td>Real-time queue sync failures</td><td><span class="badge badge-red">High</span></td><td>Low</td><td>Socket.IO reconnect logic; optimistic UI + server reconciliation; offline fallback queue view</td></tr>
+            <tr><td>Patient PHI data breach</td><td><span class="badge badge-red">Critical</span></td><td>Low</td><td>AES-256 encryption, RBAC, 2FA, regular pen tests, DPA with all providers, incident response plan</td></tr>
+            <tr><td>DLT SMS registration delay (India, 4–6 weeks)</td><td><span class="badge badge-gold">Med</span></td><td>High</td><td>Start DLT registration 6 weeks before launch; WhatsApp as primary reduces SMS dependency</td></tr>
+            <tr><td>Queue ETA inaccuracy causes frustration</td><td><span class="badge badge-gold">Med</span></td><td>High</td><td>Doctor sets custom avg consult time; system auto-calibrates from rolling 10-visit average</td></tr>
+            <tr><td>Message cost overrun</td><td><span class="badge badge-gold">Med</span></td><td>Med</td><td>Daily spend cap alerts in admin; SMS-only mode option for cost-sensitive clinics</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="prd-s20">20. Next Steps</h2>
+        <table>
+          <thead><tr><th>#</th><th>Action</th><th>Owner</th><th>Priority</th><th>Deadline</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Approve P0 MVP feature list and confirm explicit out-of-scope items</td><td>Product Owner</td><td><span class="badge badge-red">★ Critical</span></td><td>Week 1</td></tr>
+            <tr><td>2</td><td>Select WhatsApp provider: Meta direct / Twilio / 360dialog — create account</td><td>Tech Lead</td><td><span class="badge badge-red">★ Critical</span></td><td>Week 1</td></tr>
+            <tr><td>3</td><td>Start DLT SMS registration with MSG91 (India — 4–6 week process)</td><td>Tech Lead</td><td><span class="badge badge-red">★ Critical</span></td><td>Week 1</td></tr>
+            <tr><td>4</td><td>Confirm clinic-specific business rules: token prefix, GST rate, working hours, avg consult time</td><td>Clinic Owner</td><td><span class="badge badge-red">★ Critical</span></td><td>Week 1</td></tr>
+            <tr><td>5</td><td>Share branding assets: logo SVG, primary colour HEX, clinic name for PDF templates</td><td>Clinic Owner</td><td><span class="badge badge-red">★ Critical</span></td><td>Week 1</td></tr>
+            <tr><td>6</td><td>Confirm SaaS subscription model vs one-time licence; define pricing tiers</td><td>Business Owner</td><td><span class="badge badge-gold">High</span></td><td>Week 1</td></tr>
+            <tr><td>7</td><td>Approve 2FA enforcement policy: which roles require 2FA from day 1</td><td>Product Owner</td><td><span class="badge badge-gold">High</span></td><td>Week 1</td></tr>
+            <tr><td>8</td><td>Select payment gateway (Razorpay / Stripe) and obtain test API credentials</td><td>Tech Lead</td><td><span class="badge badge-muted">Medium</span></td><td>Week 2</td></tr>
+            <tr><td>9</td><td>Decide multi-language requirement at launch (Hindi / Gujarati / English-only)</td><td>Product Owner</td><td><span class="badge badge-muted">Medium</span></td><td>Week 2</td></tr>
+            <tr><td>10</td><td>Prioritize Phase 1 wireframes: Reception Dashboard, Queue Console, Doctor Consult, QR Check-in</td><td>Designer</td><td><span class="badge badge-gold">High</span></td><td>Week 2</td></tr>
+            <tr><td>11</td><td>Provision dev + staging environments; configure GitHub Actions CI/CD pipeline</td><td>DevOps</td><td><span class="badge badge-gold">High</span></td><td>Week 2</td></tr>
+            <tr><td>12</td><td>Schedule kick-off sprint planning with dev team; assign AT-01 to AT-08 to QA engineer</td><td>PM / Tech Lead</td><td><span class="badge badge-gold">High</span></td><td>Week 2</td></tr>
+          </tbody>
+        </table>
+
+      </div>
+    </div><!-- /panel-prd -->
+
+
+    <!-- ─── TECH STACK PANEL ─── -->
+    <div class="doc-panel" id="panel-tech">
+      <div class="doc-meta">
+        <div class="doc-meta-icon">⚙️</div>
+        <div>
+          <h1>Technology Stack Document</h1>
+          <p>ClinicOS — Clinic Management &amp; Patient Experience Platform</p>
+          <div class="badge-row">
+            <span class="badge badge-red">Version 1.0</span>
+            <span class="badge badge-gold">Final</span>
+            <span class="badge badge-muted">Confidential</span>
+            <span class="badge badge-muted">27 February 2026</span>
+            <span class="badge badge-green">Aligned to PRD v3.0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+
+        <h2 id="tech-s1">1. Frontend Framework — React.js 18+</h2>
+
+        <h3>Why React.js is the Right Choice for ClinicOS</h3>
+        <p>React.js is ideal for ClinicOS because the platform's core features — the real-time queue board, live token updates, multi-panel dashboards — require fine-grained component re-rendering. React's virtual DOM and component model make it efficient for frequent, partial UI updates driven by WebSocket events without full-page reloads.</p>
+
+        <table>
+          <thead><tr><th>PRD Requirement</th><th>How React Solves It</th></tr></thead>
+          <tbody>
+            <tr><td>Real-time queue board updating every second</td><td>React state drives re-renders only for changed queue rows; Socket.IO events trigger targeted setState</td></tr>
+            <tr><td>3 distinct dashboard layouts (Reception, Doctor, Admin, Patient)</td><td>React Router v6 with nested layouts; each role gets its own layout shell; code-split automatically</td></tr>
+            <tr><td>Complex EHR consultation form with autosave</td><td>React Hook Form + Zod validation; useEffect for 30-second autosave timer; field-level state prevents unnecessary re-renders</td></tr>
+            <tr><td>Prescription builder with medicine search autocomplete</td><td>Controlled components with debounced search; React context shares prescription state across nested builder components</td></tr>
+            <tr><td>Progressive Web App for mobile patients</td><td>Vite PWA plugin; React Suspense for lazy-loaded route chunks; offline-capable shell</td></tr>
+            <tr><td>Optimistic UI for instant feedback on staff actions</td><td>TanStack Query optimistic updates; queue reorder reflects immediately, rolls back if server rejects</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Exact Stack Specification</h3>
+        <table>
+          <thead><tr><th>Technology</th><th>Version</th><th>Key Benefits</th></tr></thead>
+          <tbody>
+            <tr><td><strong>React.js</strong></td><td>18+</td><td>Concurrent rendering for smooth live queue updates; Suspense + lazy() for code-split dashboards; automatic batching reduces renders</td></tr>
+            <tr><td><strong>Vite</strong></td><td>5+</td><td>HMR &lt;50ms (10× faster than CRA); tree-shaking keeps bundle small for 4G mobile; native ESM; built-in PWA plugin</td></tr>
+            <tr><td><strong>TypeScript</strong></td><td>5+</td><td>Catch PRD data model errors at compile time; IDE autocomplete for API response shapes; required for team scaling</td></tr>
+            <tr><td><strong>Tailwind CSS</strong></td><td>3</td><td>No custom CSS files; JIT purges unused styles → tiny production CSS bundle; responsive breakpoints built-in; pairs with shadcn/ui</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Key Frontend Libraries</h3>
+        <table>
+          <thead><tr><th>Library</th><th>Version</th><th>Purpose in ClinicOS</th><th>Priority</th></tr></thead>
+          <tbody>
+            <tr><td>React Router v6</td><td>v6.x</td><td>Role-based routing: /staff, /doctor, /patient, /admin with layout nesting</td><td><span class="badge badge-red">Must-have</span></td></tr>
+            <tr><td>TanStack Query v5</td><td>v5.x</td><td>Server state: patient lookup, queue fetch, billing data with background refetch and optimistic updates</td><td><span class="badge badge-red">Must-have</span></td></tr>
+            <tr><td>Socket.IO Client</td><td>v4.x</td><td>Real-time queue sync: token created/updated/served events broadcast to all connected clients</td><td><span class="badge badge-red">Must-have</span></td></tr>
+            <tr><td>Zustand</td><td>v4.x</td><td>Lightweight global state for: current user role, active clinic, queue filter, offline mode flag</td><td><span class="badge badge-red">Must-have</span></td></tr>
+            <tr><td>React Hook Form + Zod</td><td>latest</td><td>EHR consultation form, new patient registration, billing form with schema validation</td><td><span class="badge badge-red">Must-have</span></td></tr>
+            <tr><td>Recharts</td><td>v2.x</td><td>Admin analytics: revenue bar chart, wait-time trend line, complaints horizontal bar</td><td><span class="badge badge-red">Must-have</span></td></tr>
+            <tr><td>shadcn/ui</td><td>latest</td><td>Accessible component primitives: Dialog, Dropdown, Tooltip, Command (medicine search palette)</td><td><span class="badge badge-red">Must-have</span></td></tr>
+            <tr><td>React DnD Kit</td><td>v6.x</td><td>Drag-and-drop queue reordering (PRD F2 / F5 — one-tap operational controls)</td><td><span class="badge badge-red">Must-have</span></td></tr>
+            <tr><td>Vite PWA Plugin</td><td>latest</td><td>Service Worker for patient portal offline access, QR self-check-in page caching (PRD F21)</td><td><span class="badge badge-gold">Should-have</span></td></tr>
+            <tr><td>QRCode.react</td><td>v3.x</td><td>Generate QR codes for patient self-check-in kiosk (PRD F21)</td><td><span class="badge badge-gold">Should-have</span></td></tr>
+            <tr><td>Axios</td><td>v1.x</td><td>HTTP client with interceptors for JWT token refresh, request/response logging</td><td><span class="badge badge-red">Must-have</span></td></tr>
+          </tbody>
+        </table>
+
+        <h3>Project Structure</h3>
+        <pre><code>src/
+  app/           # App-level: Router, Providers, GlobalLayout
+  features/      # Feature-first organization (PRD-aligned)
+    queue/       # F1-F5: Token list, Queue board, Emergency controls
+    patients/    # F1: Phone lookup, Profile, Visit history
+    consultation/# F4: EHR form, Prescription builder, Attachments
+    billing/     # F6: Bill creation, Payment, Receipt PDF
+    analytics/   # F7: Admin dashboard, Charts, Reports
+    appointments/# F8: Booking calendar, Slot picker
+    messaging/   # F3+F9: Template editor, Notification logs
+    auth/        # Login, OTP, 2FA flow
+  components/    # Shared: Avatar, Tag, MetricCard, TokenCard, Toast
+  hooks/         # useQueue, usePatient, useSocket, useAuth
+  services/      # API layer: patients.ts, queue.ts, billing.ts
+  stores/        # Zustand stores: auth, clinic, uiState
+  types/         # TypeScript: Patient, Visit, Token, Bill, Doctor
+  utils/         # formatPhone, calculateETA, formatCurrency</code></pre>
+
+        <h2 id="tech-s2">2. Styling Solution — Tailwind CSS + shadcn/ui</h2>
+
+        <h3>Design Token Configuration</h3>
+        <pre><code>// tailwind.config.js
+module.exports = {
+  theme: {
+    extend: {
+      colors: {
+        cream: { DEFAULT: '#F5EFE0', light: '#FAF7F0', mid: '#EDE5D0' },
+        red: { primary: '#E04B67', medium: '#D43D5A', pale: '#FAD4DC' },
+        burgundy: { DEFAULT: '#2C0F1A', mid: '#3D1525', light: '#6B2D42' },
+        gold: { DEFAULT: '#F2C24A', pale: '#FEF5D4' },
+        mint: { DEFAULT: '#7ECFB5', pale: '#E8F8F3' },
+        blue: { DEFAULT: '#A8C8E8', pale: '#EAF4FD' },
+        purple: { DEFAULT: '#C4A8D8', pale: '#F0E8FA' },
+      },
+      fontFamily: {
+        display: ['Nunito', 'Fredoka One', 'cursive'],
+        body: ['Nunito Sans', 'DM Sans', 'sans-serif'],
+      },
+      borderRadius: { xl: '32px', '2xl': '48px', pill: '999px' },
+    }
+  }
+}</code></pre>
+
+        <h3>shadcn/ui Component Usage</h3>
+        <table>
+          <thead><tr><th>shadcn/ui Component</th><th>ClinicOS Usage</th><th>PRD Feature</th></tr></thead>
+          <tbody>
+            <tr><td>Command (⌘K palette)</td><td>Medicine search autocomplete in prescription builder</td><td>F4 — EHR / Prescription</td></tr>
+            <tr><td>Dialog / Alert Dialog</td><td>Queue action confirmations (emergency, pause, lab)</td><td>F5 — Operational Controls</td></tr>
+            <tr><td>Dropdown Menu</td><td>Token action menu (move, cancel, edit)</td><td>F2 — Queue Management</td></tr>
+            <tr><td>Popover</td><td>Phone lookup suggestion dropdown</td><td>F1 — Patient Lookup</td></tr>
+            <tr><td>Calendar</td><td>Appointment date picker</td><td>F8 — Appointment Booking</td></tr>
+            <tr><td>Data Table (TanStack Table)</td><td>Patient directory, audit logs, message history</td><td>F10, F11, F12</td></tr>
+            <tr><td>Badge</td><td>Token status (NOW, NEXT, WAITING, LAB, HOLD)</td><td>F2 — Queue board</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="tech-s3">3. Backend — Node.js 20 LTS + Express.js</h2>
+
+        <h3>Why Node.js is the Right Backend for ClinicOS</h3>
+        <p>ClinicOS's most demanding backend feature is the real-time queue: every token status change must broadcast to all connected clients within 1 second. Node.js's event-loop architecture is built for exactly this — handling many concurrent WebSocket connections efficiently without spawning OS threads per connection.</p>
+
+        <table>
+          <thead><tr><th>PRD Requirement</th><th>Why Node.js Handles It Well</th></tr></thead>
+          <tbody>
+            <tr><td>Real-time queue updates ≤1s broadcast</td><td>Socket.IO runs natively in Node's event loop; no thread context-switching overhead; pub/sub via Redis adapter scales across multiple Node instances</td></tr>
+            <tr><td>200 concurrent staff/doctor sessions</td><td>Node handles 10,000+ concurrent connections on a single process; much cheaper than multi-threaded PHP/Java at this scale</td></tr>
+            <tr><td>API response P95 &lt;500ms on phone lookup</td><td>Redis-cached lookups are I/O-bound (not CPU-bound); Node's async I/O maximises Redis throughput</td></tr>
+            <tr><td>PDF generation (Puppeteer)</td><td>Puppeteer runs as a child process; Node spawns it async and responds when ready without blocking the event loop</td></tr>
+            <tr><td>Multi-tenant clinic isolation</td><td>Middleware can extract clinic_id from JWT and scope all DB queries in one centralized place</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Backend Architecture</h3>
+        <pre><code>backend/src/
+  app.ts           # Express app setup, CORS, global middleware
+  server.ts        # HTTP server + Socket.IO attachment
+  routes/          # Route definitions (no logic)
+  controllers/     # Request validation → service call → response
+  services/        # Business logic
+    QueueService.ts   # ETA calculation, reorder, pause/resume
+    MessageService.ts # Template render, provider routing, retry
+    BillingService.ts # Tax calc, PDF generation, reconciliation
+  middleware/
+    auth.ts        # JWT verification + clinic_id extraction
+    rbac.ts        # Role-based permission checks
+    rateLimit.ts   # Redis sliding-window rate limiter
+    audit.ts       # Auto-log critical mutations
+  socket/
+    queueHandler.ts  # Socket.IO event handlers for queue events
+    adapter.ts       # Redis adapter for multi-instance pub/sub
+  db/
+    pool.ts        # PostgreSQL connection pool (pg)
+    migrations/    # SQL migration files (node-pg-migrate)
+  jobs/            # Background jobs (cron, workers)
+    messageWorker.ts # RabbitMQ consumer for outbound messages
+    reminderJob.ts   # Appointment 24h/1h reminder cron
+    metricsJob.ts    # Refresh materialized views every 5 min</code></pre>
+
+        <h3>Framework Comparison</h3>
+        <table>
+          <thead><tr><th>Criterion</th><th>Express.js ✅ (MVP)</th><th>Fastify (Phase 2)</th></tr></thead>
+          <tbody>
+            <tr><td>Throughput</td><td>~45K req/s</td><td>~85K req/s</td></tr>
+            <tr><td>Learning curve</td><td>Near-zero (most devs know Express)</td><td>Low (similar API)</td></tr>
+            <tr><td>Ecosystem maturity</td><td>Largest (10+ years)</td><td>Growing fast</td></tr>
+            <tr><td>Socket.IO compat.</td><td>Official support</td><td>Official support</td></tr>
+            <tr><td>ClinicOS recommendation</td><td><strong>✅ Use for MVP</strong></td><td>Upgrade if needed</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="tech-s4">4. Database — PostgreSQL 16</h2>
+        <p>PostgreSQL is strongly recommended over MySQL for ClinicOS. The specific reasons are explained below with direct PRD references.</p>
+
+        <table>
+          <thead><tr><th>PRD Feature</th><th>PostgreSQL 16 ✅</th><th>MySQL 8.x ⚠️</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Prescription storage (JSONB)</strong></td><td>JSONB — binary JSON with indexing; query inside JSON without fetching full row. Used in Visit.prescriptions, Clinic.settings, Bill.items</td><td>JSON type supported but no native GIN/BRIN indexes on JSON; slower range queries</td></tr>
+            <tr><td><strong>Full-text search (PRD F10)</strong></td><td>Built-in tsvector full-text search across complaint, diagnosis, notes. No extra service for MVP</td><td>Full-text is CHAR-based and less expressive; often requires Elasticsearch sooner</td></tr>
+            <tr><td><strong>Row-level security (PRD §12)</strong></td><td>RLS policies enforce patient data isolation at DB level — not just application code</td><td>No native RLS; security must be enforced purely in application code (higher breach risk)</td></tr>
+            <tr><td><strong>Materialized views (PRD F7 analytics)</strong></td><td>Native REFRESH MATERIALIZED VIEW CONCURRENTLY — analytics views refresh without locking reads</td><td>No native materialized views; must simulate with stored procedures</td></tr>
+            <tr><td><strong>Array fields (complaint_tags[])</strong></td><td>Native array columns with GIN index — complaint_tags TEXT[] searchable efficiently</td><td>No native arrays; requires junction table for tags (extra join, extra migration)</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Key Schema (PostgreSQL-specific)</h3>
+        <pre><code>-- Patient table (multi-tenant, consent tracked)
+CREATE TABLE patients (
+  patient_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id  UUID NOT NULL REFERENCES clinics(clinic_id),
+  phone      VARCHAR(15) NOT NULL,
+  name       VARCHAR(200),
+  dob        DATE,
+  opt_in_messaging BOOLEAN DEFAULT true,
+  consent_timestamp TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(clinic_id, phone)
+);
+
+-- Visit with JSONB prescription (no extra table needed)
+CREATE TABLE visits (
+  visit_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id     UUID REFERENCES patients(patient_id),
+  doctor_id      UUID REFERENCES doctors(doctor_id),
+  clinic_id      UUID NOT NULL,
+  complaint      TEXT,
+  complaint_tags TEXT[],           -- Native array, GIN indexed
+  diagnosis      TEXT,
+  notes          TEXT,             -- Doctor-private notes
+  prescriptions  JSONB,            -- [{name, dose, freq, duration}]
+  tests_ordered  TEXT[],
+  follow_up_date DATE,
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Full-text search index
+ALTER TABLE visits ADD COLUMN search_vector TSVECTOR
+  GENERATED ALWAYS AS (
+    to_tsvector('english', coalesce(complaint,'') || ' ' ||
+    coalesce(diagnosis,'') || ' ' || coalesce(notes,''))
+  ) STORED;
+CREATE INDEX idx_visits_search ON visits USING GIN (search_vector);
+
+-- Token/Queue with status ENUM
+CREATE TYPE token_status AS ENUM
+  ('waiting','now','on_hold','served','cancelled');
+
+CREATE TABLE tokens (
+  token_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id         UUID NOT NULL,
+  patient_id        UUID REFERENCES patients(patient_id),
+  token_number      INT NOT NULL,
+  queue_position    INT,
+  status            token_status DEFAULT 'waiting',
+  estimated_wait_mins INT,
+  issued_at         TIMESTAMPTZ DEFAULT NOW(),
+  called_at         TIMESTAMPTZ,
+  served_at         TIMESTAMPTZ
+);</code></pre>
+
+        <h3>Redis Usage</h3>
+        <table>
+          <thead><tr><th>Redis Usage</th><th>What it Stores</th><th>TTL / Pattern</th></tr></thead>
+          <tbody>
+            <tr><td>Hot queue cache</td><td>Current queue state per clinic+doctor as serialized JSON</td><td>Refreshed on every token mutation; no TTL</td></tr>
+            <tr><td>Patient lookup cache</td><td>Last 500 phone lookups per clinic per day</td><td>5-minute TTL; reduces DB read load</td></tr>
+            <tr><td>Slot reservation</td><td>Appointment slot holds during booking flow</td><td>5-minute TTL; auto-released on timeout</td></tr>
+            <tr><td>Rate limit counters</td><td>Sliding window counters per IP and per user_id</td><td>Rolling 1-minute window; stored as sorted sets</td></tr>
+            <tr><td>JWT blocklist</td><td>Invalidated tokens after logout or role change</td><td>TTL = original token expiry time</td></tr>
+            <tr><td>OTP store</td><td>Hashed OTP + expiry for patient and staff 2FA</td><td>5-minute TTL; single-use (deleted on first correct use)</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="tech-s5">5. Package Registry</h2>
+
+        <h3>Frontend Dependencies</h3>
+        <table>
+          <thead><tr><th>Package</th><th>Version</th><th>Category</th><th>Why Essential</th></tr></thead>
+          <tbody>
+            <tr><td>react + react-dom</td><td>^18.3</td><td>Core</td><td>UI rendering engine</td></tr>
+            <tr><td>react-router-dom</td><td>^6.x</td><td>Routing</td><td>Role-based navigation with nested layouts</td></tr>
+            <tr><td>typescript</td><td>^5.x</td><td>DX</td><td>Type safety across PRD data model</td></tr>
+            <tr><td>vite + @vitejs/plugin-react</td><td>^5.x</td><td>Build</td><td>Sub-50ms HMR; PWA plugin support</td></tr>
+            <tr><td>tailwindcss</td><td>^3.x</td><td>Styling</td><td>Utility-first design system token support</td></tr>
+            <tr><td>@tanstack/react-query</td><td>^5.x</td><td>State</td><td>Server state caching; optimistic updates</td></tr>
+            <tr><td>zustand</td><td>^4.x</td><td>State</td><td>Global auth, clinic, offline mode state</td></tr>
+            <tr><td>socket.io-client</td><td>^4.x</td><td>Real-time</td><td>Queue WebSocket subscription</td></tr>
+            <tr><td>axios</td><td>^1.x</td><td>HTTP</td><td>API calls with JWT interceptor and refresh</td></tr>
+            <tr><td>react-hook-form + zod</td><td>^7.x / ^3.x</td><td>Forms</td><td>EHR consultation form, patient registration</td></tr>
+            <tr><td>date-fns</td><td>^3.x</td><td>Utils</td><td>ETA display, appointment scheduling, visit timeline</td></tr>
+            <tr><td>recharts</td><td>^2.x</td><td>Charts</td><td>Admin analytics: revenue, wait time, complaints</td></tr>
+            <tr><td>@dnd-kit/core</td><td>^6.x</td><td>Drag-drop</td><td>Queue row drag-and-drop reordering (PRD F2/F5)</td></tr>
+            <tr><td>qrcode.react</td><td>^3.x</td><td>QR</td><td>Patient self-check-in QR generation (PRD F21)</td></tr>
+            <tr><td>vite-plugin-pwa</td><td>^0.x</td><td>PWA</td><td>Service Worker for patient portal offline access</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Backend Dependencies</h3>
+        <table>
+          <thead><tr><th>Package</th><th>Version</th><th>Purpose</th><th>Why This One</th></tr></thead>
+          <tbody>
+            <tr><td>express</td><td>^4.x</td><td>HTTP routing framework</td><td>Most mature option; team familiarity</td></tr>
+            <tr><td>socket.io</td><td>^4.x</td><td>WebSocket server for real-time queue</td><td>Official adapter for Redis; rooms for clinic isolation</td></tr>
+            <tr><td>@socket.io/redis-adapter</td><td>^8.x</td><td>Multi-server Socket.IO pub/sub</td><td>Required when scaling beyond 1 server instance</td></tr>
+            <tr><td>pg (node-postgres)</td><td>^8.x</td><td>PostgreSQL driver</td><td>Most stable PG driver; supports connection pooling via pg.Pool</td></tr>
+            <tr><td>ioredis</td><td>^5.x</td><td>Redis client</td><td>Supports cluster mode, pipelining, Lua scripts for atomic rate limiting</td></tr>
+            <tr><td>amqplib</td><td>^0.x</td><td>RabbitMQ client</td><td>Low-level but reliable; used for message queue worker</td></tr>
+            <tr><td>jsonwebtoken</td><td>^9.x</td><td>JWT sign and verify</td><td>Stateless auth; RS256 keys recommended for production</td></tr>
+            <tr><td>express-rate-limit + rate-limit-redis</td><td>^7.x / ^4.x</td><td>API rate limiting</td><td>Redis-backed sliding window; survives server restarts</td></tr>
+            <tr><td>helmet</td><td>^7.x</td><td>HTTP security headers</td><td>Sets CSP, HSTS, X-Content-Type automatically</td></tr>
+            <tr><td>puppeteer</td><td>^22.x</td><td>PDF generation</td><td>Headless Chrome; Handlebars templates for clinic letterhead</td></tr>
+            <tr><td>handlebars</td><td>^4.x</td><td>PDF and email template engine</td><td>Mustache syntax; same templates used for WhatsApp and Email</td></tr>
+            <tr><td>nodemailer</td><td>^6.x</td><td>Outbound email</td><td>SMTP + SendGrid/SES transport; supports attachments for PDFs</td></tr>
+            <tr><td>multer</td><td>^1.x</td><td>File upload handling</td><td>Multipart form parser; streams to S3 without buffering locally</td></tr>
+            <tr><td>@aws-sdk/client-s3</td><td>^3.x</td><td>S3 file storage</td><td>AWS SDK v3 modular — import only S3 module</td></tr>
+            <tr><td>uuid</td><td>^9.x</td><td>UUID v4 generation</td><td>Crypto-secure; no DB sequence dependency</td></tr>
+            <tr><td>winston</td><td>^3.x</td><td>Structured logging</td><td>JSON logs to stdout; CloudWatch / BetterStack integration</td></tr>
+            <tr><td>node-cron</td><td>^3.x</td><td>Appointment reminder scheduler</td><td>Lightweight cron inside Node process</td></tr>
+            <tr><td>zod</td><td>^3.x</td><td>Request body validation + env validation</td><td>Type-safe validation; schemas reusable between FE and BE</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="tech-s6">6. Deployment &amp; Hosting</h2>
+
+        <h3>Two-Phase Hosting Strategy</h3>
+        <table>
+          <thead><tr><th>Service</th><th>MVP Phase (Month 1–3)</th><th>Production Phase (Month 4+)</th><th>Estimated Cost</th></tr></thead>
+          <tbody>
+            <tr><td>Frontend</td><td>Vercel (React SPA + CDN)</td><td>Vercel Pro</td><td>Free → ₹1,500/mo</td></tr>
+            <tr><td>Backend API</td><td>Railway (Node.js service)</td><td>AWS ECS Fargate (autoscaling containers)</td><td>₹400 → ₹6,000/mo</td></tr>
+            <tr><td>Database</td><td>Railway PostgreSQL OR Supabase (500MB free)</td><td>AWS RDS PostgreSQL (Multi-AZ)</td><td>Free → ₹5,000/mo</td></tr>
+            <tr><td>Redis</td><td>Railway Redis OR Upstash</td><td>AWS ElastiCache (Redis cluster)</td><td>Free → ₹2,500/mo</td></tr>
+            <tr><td>Message Broker</td><td>CloudAMQP (free 1M msg/mo)</td><td>AWS SQS OR self-hosted RabbitMQ</td><td>Free → ₹1,200/mo</td></tr>
+            <tr><td>File Storage</td><td>Cloudflare R2 (10 GB free)</td><td>Cloudflare R2 OR AWS S3</td><td>Free → ₹800/mo</td></tr>
+            <tr><td>Email</td><td>SendGrid (100/day free)</td><td>AWS SES (₹0.10/1K emails)</td><td>Free → ₹1,500/mo</td></tr>
+            <tr><td>Monitoring</td><td>BetterStack (free uptime)</td><td>Sentry + Datadog / AWS CloudWatch</td><td>Free → ₹3,000/mo</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Production AWS Architecture</h3>
+        <pre><code>Internet
+→ Cloudflare (WAF + DDoS + CDN for static assets)
+→ AWS ALB (Application Load Balancer)
+→ ECS Fargate Cluster
+   ├── clinicos-api service (Node.js, 2–4 tasks, auto-scale)
+   ├── clinicos-worker service (RabbitMQ consumer, 1–2 tasks)
+   └── clinicos-jobs service (cron scheduler, 1 task)
+→ AWS RDS PostgreSQL 16 (Multi-AZ, db.t3.medium, automated backups)
+→ AWS ElastiCache Redis 7 (cluster mode, cache.t3.micro)
+→ AWS SQS (Standard Queue for messages + FIFO for payments)
+→ AWS S3 (lab attachments, prescription PDFs, invoice PDFs)
+→ AWS SES (transactional email with bounce handling)
+→ AWS CloudWatch (logs, metrics, alarms)
+→ AWS Secrets Manager (DB creds, WhatsApp API keys, JWT secrets)
+
+Frontend (React SPA):
+→ Vercel (Edge Network CDN) OR AWS S3 + CloudFront</code></pre>
+
+        <h3>CI/CD Pipeline — GitHub Actions</h3>
+        <pre><code>name: ClinicOS CI/CD
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    steps:
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm run lint
+      - run: npm run test:unit
+      - run: npm run test:integration  # against test DB
+
+  e2e:  # Only on main branch
+    needs: test
+    steps:
+      - run: npx playwright test  # AT-01 to AT-08 from PRD §15
+
+  deploy-staging:
+    needs: [test, e2e]
+    steps:
+      - run: railway deploy --environment staging
+      - run: railway run npm run db:migrate
+
+  deploy-production:  # Manual approval required
+    needs: deploy-staging
+    environment: production
+    steps:
+      - run: railway deploy --environment production</code></pre>
+
+        <h3>12-Month Cost Estimate</h3>
+        <table>
+          <thead><tr><th>Period</th><th>Monthly Cost</th><th>What It Covers</th><th>Break-even Clinics</th></tr></thead>
+          <tbody>
+            <tr><td>Month 1–3 (MVP)</td><td>₹800–2,000/mo</td><td>Railway + Vercel Free + CloudAMQP Free + Cloudflare R2 Free</td><td>1 clinic</td></tr>
+            <tr><td>Month 4–6 (Growth)</td><td>₹4,000–8,000/mo</td><td>Railway Pro + Vercel Pro + SendGrid + SMS provider + Cloudflare R2 paid</td><td>3–5 clinics</td></tr>
+            <tr><td>Month 7–12 (Scale)</td><td>₹15,000–30,000/mo</td><td>AWS ECS + RDS Multi-AZ + ElastiCache + SES + CloudFront + monitoring</td><td>10–20 clinics</td></tr>
+            <tr><td>Year 2+ (SaaS)</td><td>₹40,000–80,000/mo</td><td>Full AWS production stack with redundancy, backups, Sentry, Datadog</td><td>50+ clinics</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="tech-s7">7. Dev Tools &amp; Workflow</h2>
+
+        <h3>Development Environment Setup</h3>
+        <pre><code># Prerequisites
+node >= 20.0.0 (LTS)  # nvm install 20 && nvm use 20
+npm  >= 10.0.0        # Included with Node 20
+docker + docker-compose # Local PostgreSQL, Redis, RabbitMQ
+
+# Global tools
+npm install -g tsx               # TypeScript execution
+npm install -g node-pg-migrate   # DB migration CLI
+npm install -g @railway/cli      # Railway deployment CLI
+npm install -g vercel            # Vercel deployment CLI
+
+# docker-compose.yml for local dev
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports: ['5432:5432']
+    environment:
+      POSTGRES_DB: clinicos_dev
+      POSTGRES_PASSWORD: devpassword
+  redis:
+    image: redis:7-alpine
+    ports: ['6379:6379']
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports: ['5672:5672', '15672:15672']</code></pre>
+
+        <h3>Monorepo Structure</h3>
+        <pre><code>clinicos/                  # Monorepo root
+  packages/
+    client/                # React frontend (Vite)
+      src/
+      vite.config.ts
+      tailwind.config.js
+    server/                # Node.js backend (Express)
+      src/
+      tsconfig.json
+    shared/                # Shared TypeScript types
+      types/               # Patient, Visit, Token, Bill
+      validation/          # Zod schemas shared between FE + BE
+  docker-compose.yml       # Local dev: PG + Redis + RabbitMQ
+  .github/workflows/
+    ci.yml                 # Test + lint on every PR
+    deploy.yml             # Deploy to Railway/Vercel on main</code></pre>
+
+        <h3>Testing Strategy</h3>
+        <table>
+          <thead><tr><th>Test Type</th><th>Tool</th><th>What to Test</th><th>Coverage Target</th><th>When Run</th></tr></thead>
+          <tbody>
+            <tr><td>Unit Tests</td><td>Vitest</td><td>ETA calculation, billing tax calc, template variable substitution, phone normalization</td><td>≥80%</td><td>Every commit (fast, &lt;10s)</td></tr>
+            <tr><td>Component Tests</td><td>@testing-library/react</td><td>Queue token card renders correct status, phone lookup shows patient name</td><td>≥70%</td><td>Every commit</td></tr>
+            <tr><td>Integration Tests</td><td>Supertest + test DB</td><td>All API endpoints: POST /patients/lookup, POST /queues, POST /bills</td><td>All P0 routes</td><td>Every PR</td></tr>
+            <tr><td>E2E Tests</td><td>Playwright</td><td>PRD Acceptance Tests AT-01 to AT-08: full browser flows</td><td>AT-01 to AT-08</td><td>On merge to main</td></tr>
+            <tr><td>Load Tests</td><td>k6 / Artillery</td><td>200 concurrent users; 1,000 tokens/day; queue reorder under load</td><td>P95 targets</td><td>Pre-launch</td></tr>
+            <tr><td>Security Tests</td><td>OWASP ZAP + manual</td><td>SQL injection, RBAC boundary tests, JWT expiry, rate limit enforcement</td><td>All RBAC paths</td><td>Pre-launch + monthly</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="tech-s8">8. Architecture Overview</h2>
+
+        <h3>Data Flow: Patient Token Creation → WhatsApp Sent</h3>
+        <table>
+          <thead><tr><th>Step</th><th>What Happens</th><th>Technology</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Receptionist enters phone on Reception Dashboard → TanStack Query calls POST /api/patients/lookup</td><td>React + Axios</td></tr>
+            <tr><td>2</td><td>Express middleware validates JWT; extracts clinic_id; RBAC checks 'staff' role</td><td>Node.js + JWT + RBAC middleware</td></tr>
+            <tr><td>3</td><td>QueueService queries PostgreSQL via pg.Pool; checks Redis cache first (5-min TTL)</td><td>PostgreSQL + Redis + pg</td></tr>
+            <tr><td>4</td><td>Patient found → response returned; receptionist selects doctor → clicks Issue Token</td><td>React → API → Express</td></tr>
+            <tr><td>5</td><td>POST /api/queues: QueueService inserts token row in PostgreSQL; calculates ETA from rolling average</td><td>PostgreSQL (transaction)</td></tr>
+            <tr><td>6</td><td>QueueService publishes 'token:created' event to Socket.IO room 'clinic:{clinic_id}'</td><td>Socket.IO server</td></tr>
+            <tr><td>7</td><td>All connected clients (reception, doctor dashboard) receive event; React re-renders queue list</td><td>Socket.IO client → TanStack Query invalidation</td></tr>
+            <tr><td>8</td><td>API handler publishes message job to RabbitMQ: {patient_id, template:'token_issued', variables:{...}}</td><td>amqplib → RabbitMQ</td></tr>
+            <tr><td>9</td><td>MessageWorker picks up job; checks opt_in_messaging = true; renders WhatsApp template</td><td>Node.js worker process</td></tr>
+            <tr><td>10</td><td>MessageWorker calls WhatsApp Business API; updates MessageLog in PostgreSQL with 'sent' status</td><td>Axios → Meta API → PostgreSQL</td></tr>
+            <tr><td>11</td><td>Meta sends delivery webhook → POST /webhooks/whatsapp → MessageLog status = 'delivered'</td><td>Express webhook handler</td></tr>
+          </tbody>
+        </table>
+
+        <h2 id="tech-s9">9. Decision Summary &amp; Rationale</h2>
+
+        <h3>Performance Targets — Stack Mapping</h3>
+        <table>
+          <thead><tr><th>PRD Target (§18 NFR)</th><th>Stack Component That Achieves It</th></tr></thead>
+          <tbody>
+            <tr><td>Phone lookup P95 &lt;500ms</td><td>Redis cache for returning patients (&lt;5ms hit); PostgreSQL indexed query for new lookups (&lt;50ms); Express overhead &lt;10ms</td></tr>
+            <tr><td>Queue broadcast ≤1 second</td><td>Socket.IO event fired synchronously after DB write; Redis pub/sub across instances &lt;20ms</td></tr>
+            <tr><td>Page load mobile 4G &lt;2 seconds</td><td>Vite code splitting: each dashboard chunk &lt;150KB; Vercel CDN edge node in Mumbai; Tailwind JIT CSS &lt;10KB</td></tr>
+            <tr><td>WhatsApp send P50 &lt;10 seconds</td><td>RabbitMQ consumer processes job in &lt;1s; Meta API P50 delivery 3–7s; total end-to-end typically 5–8s</td></tr>
+            <tr><td>Dashboard load 7–30 day range &lt;3s</td><td>PostgreSQL materialized views refreshed every 5 min via cron; analytics queries hit pre-aggregated data &lt;200ms</td></tr>
+            <tr><td>Rate limit &lt;2ms overhead per request</td><td>ioredis pipeline; sliding window counter single INCR + EXPIRE command; measured &lt;1ms on Redis</td></tr>
+            <tr><td>PDF generation &lt;5 seconds</td><td>Puppeteer runs as separate process; HTML → PDF typically 2–3s for standard bill; cached template compilation</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Technical Risk Assessment</h3>
+        <table>
+          <thead><tr><th>Technical Risk</th><th>Severity</th><th>Mitigation</th></tr></thead>
+          <tbody>
+            <tr><td>WhatsApp API approval delays (Meta)</td><td><span class="badge badge-red">High</span></td><td>Use Twilio WhatsApp sandbox for dev; apply Meta Business Account in Week 1; SMS (MSG91) as primary MVP fallback</td></tr>
+            <tr><td>Node.js single-thread CPU spike during PDF generation</td><td><span class="badge badge-gold">Medium</span></td><td>Puppeteer runs as child process; rate-limit PDF endpoint (5 req/min); use job queue for PDF generation</td></tr>
+            <tr><td>PostgreSQL connection pool exhaustion during peak clinic hours</td><td><span class="badge badge-gold">Medium</span></td><td>pg.Pool configured with max:20 connections; PgBouncer for connection pooling at scale; read replicas for analytics</td></tr>
+            <tr><td>Redis cache invalidation race conditions on queue reorder</td><td><span class="badge badge-gold">Medium</span></td><td>Optimistic locking with PostgreSQL transactions as source of truth; Redis is cache only; stale data auto-corrects within 1s</td></tr>
+            <tr><td>DLT SMS registration delays (India, 4–6 weeks)</td><td><span class="badge badge-red">High</span></td><td>Start DLT registration Week 1; WhatsApp is primary channel so MVP is not blocked</td></tr>
+            <tr><td>TypeScript type drift between frontend and backend</td><td><span class="badge badge-green">Low</span></td><td>Shared types in packages/shared; CI checks both client and server compile against shared types</td></tr>
+          </tbody>
+        </table>
+
+      </div>
+    </div><!-- /panel-tech -->
+
+  </main>
+</div>
+
+<button id="scroll-top" onclick="scrollToTop()">↑</button>
+
+<script>
+  function switchTab(tab) {
+    // Update buttons
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+
+    // Update panels
+    document.querySelectorAll('.doc-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + tab).classList.add('active');
+
+    // Update sidebars
+    document.getElementById('nav-prd').style.display = tab === 'prd' ? 'block' : 'none';
+    document.getElementById('nav-tech').style.display = tab === 'tech' ? 'block' : 'none';
+
+    // Scroll to top
+    window.scrollTo(0, 0);
+  }
+
+  // Scroll to top button
+  window.addEventListener('scroll', () => {
+    const btn = document.getElementById('scroll-top');
+    btn.classList.toggle('visible', window.scrollY > 400);
+  });
+
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Active nav link highlighting
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        document.querySelectorAll('.nav-link').forEach(link => {
+          link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px' });
+
+  document.querySelectorAll('h2[id], h3[id]').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

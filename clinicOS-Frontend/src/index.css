@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Global Base Styles ───────────────────────────────────────── */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-body bg-cream-50 text-text-body;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display text-text-primary;
+  }
+}
+
+/* ─── Reusable Component Classes ──────────────────────────────── */
+@layer components {
+
+  /* Nav gradient — the signature crimson gradient from design doc */
+  .nav-gradient {
+    background: linear-gradient(160deg, #D95570 0%, #A02040 55%, #4E0E20 100%);
+  }
+
+  /* Hero glow background */
+  .hero-glow {
+    background:
+      radial-gradient(ellipse at 60% 40%, rgba(240,192,48,0.25) 0%, rgba(196,48,85,0.12) 50%, transparent 80%),
+      #F5EDD8;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-pill bg-crimson-800 text-white font-body font-bold text-sm uppercase tracking-wider shadow-btn transition-all duration-200;
+  }
+  .btn-primary:hover {
+    @apply bg-crimson-700 shadow-hero -translate-y-0.5;
+  }
+
+  /* Yellow CTA button (used on dark backgrounds) */
+  .btn-cta {
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-pill bg-accent-yellow text-crimson-900 font-body font-bold text-sm uppercase tracking-wider shadow-btn transition-all duration-200;
+  }
+  .btn-cta:hover {
+    @apply brightness-105 shadow-hero -translate-y-0.5;
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-pill font-body font-semibold text-sm text-crimson-500 hover:text-crimson-700 transition-colors duration-200;
+  }
+
+  /* Stat / feature card */
+  .card {
+    @apply bg-white rounded-3xl p-6 shadow-card border border-cream-300;
+  }
+
+  /* Section wrapper */
+  .section-container {
+    @apply max-w-6xl mx-auto px-6 md:px-10;
+  }
+}
+
+/* ─── Toast slide-up animation ─────────────────────────────────── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
