@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs')
-const { User, Clinic, JoinRequest } = require('../models')
+const { User, Clinic, JoinRequest, Patient } = require('../models')
 const { generateToken } = require('../utils/generateToken')
 const { generateClinicCode } = require('../utils/generateCode')
 
@@ -26,6 +26,19 @@ const registerUser = async ({ name, email, password, phone, role, clinicData, cl
     status,
     emailVerified: true, // OTP was already verified before calling register
   })
+
+  // ── Link to existing walk-in patient record if phone matches ─────
+  if (role === 'patient' && phone) {
+    const existingPatient = await Patient.findOne({
+      where: { phone, userId: null }
+    })
+    if (existingPatient) {
+      // Link existing walk-in record to this new user account
+      await existingPatient.update({ userId: user.id })
+    }
+    // Note: if no patient record exists yet, it gets created when
+    // staff registers them at reception — the userId link happens then
+  }
 
   let clinicId   = null
   let clinicName = null

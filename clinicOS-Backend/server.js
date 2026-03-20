@@ -22,14 +22,12 @@ app.use(express.urlencoded({ extended: true }))
 app.get('/api/health', (req, res) => {
   res.json({ success: true, data: { status: 'ok', time: new Date().toISOString() } })
 })
-const authRoutes = require('./src/routes/auth.routes')
-console.log('authRoutes type:', typeof authRoutes)
-app.use('/api/auth', authRoutes)
-app.use('/api/admin', require('./src/routes/clinic.routes'))
-// ── Routes (add each as you build them) ───────────────────────────────────────
-// app.use('/api/auth',      require('./src/routes/auth.routes'))
-// app.use('/api/admin',     require('./src/routes/clinic.routes'))
+
+// ── Routes ───────────────────────────────────────────────────────────────────
+app.use('/api/auth',      require('./src/routes/auth.routes'))
+app.use('/api/admin',     require('./src/routes/clinic.routes'))
 app.use('/api/patients',  require('./src/routes/patient.routes'))
+app.use('/api/patient',   require('./src/routes/patientPortal.routes'))
 app.use('/api/tokens',    require('./src/routes/token.routes'))
 app.use('/api/visits',    require('./src/routes/visit.routes'))
 app.use('/api/bills',     require('./src/routes/bill.routes'))
@@ -53,7 +51,6 @@ const start = async () => {
     console.log('✅ MySQL connected')
 
     // sync({ alter: true }) updates existing tables to match your models
-    // without dropping data — safe for development
     await sequelize.sync({ alter: true })
     console.log('✅ All tables synced')
 
@@ -66,4 +63,8 @@ const start = async () => {
   }
 }
 
-start()
+if (require.main === module) {
+  start()
+}
+
+module.exports = app

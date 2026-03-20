@@ -13,7 +13,7 @@ const Patient = sequelize.define('Patient', {
   },
   clinicId: {
     type:      DataTypes.UUID,
-    allowNull: false,
+    allowNull: true,
   },
   phone: {
     type:      DataTypes.STRING(15),

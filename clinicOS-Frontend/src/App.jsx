@@ -29,6 +29,12 @@ import ForgotPassword   from './pages/auth/ForgotPassword'
 import ResetPassword    from './pages/auth/ResetPassword'
 import UnauthorizedPage from './pages/auth/UnauthorizedPage'
 
+import PatientLayout    from './layouts/PatientLayout'
+import PatientDashboard from './pages/patient/PatientDashboard'
+import QueueTracker     from './pages/patient/QueueTracker'
+import VisitHistory     from './pages/patient/VisitHistory'
+import BillHistory      from './pages/patient/BillHistory'
+
 // Routes where public Navbar/Footer should be hidden
 const HIDE_NAV_ROUTES = [
   '/pending',
@@ -111,11 +117,16 @@ function AppContent() {
   <Route path="messages" element={<MessageLogs />} />
   <Route path="settings" element={<ClinicSettings />} />
 </Route>
-        <Route path="/patient/*" element={
+        <Route path="/patient" element={
           <ProtectedRoute allowedRoles={['patient']}>
-            <ComingSoon name="Patient Portal" />
+            <PatientLayout />
           </ProtectedRoute>
-        } />
+        }>
+          <Route index           element={<PatientDashboard />} />
+          <Route path="queue"    element={<QueueTracker />} />
+          <Route path="history"  element={<VisitHistory />} />
+          <Route path="bills"    element={<BillHistory />} />
+        </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -49,12 +49,12 @@ const getTokens = async (req, res) => {
 
 // POST /api/tokens
 const createToken = async (req, res) => {
-  const { patientId, doctorId } = req.body
-  const clinicId = req.user.clinicId
-
-  if (!patientId) return error(res, 'Patient ID is required', 400)
-
   try {
+    const { patientId, doctorId } = req.body
+    const clinicId = req.user.clinicId
+
+    if (!patientId) return error(res, 'Patient ID is required', 400)
+
     // Check patient not already in queue
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -117,8 +117,8 @@ const createToken = async (req, res) => {
           queue_position:  waitingCount + 1,
           estimated_wait:  estimatedWait,
         },
-        channels: ['email'],
-        // Add 'whatsapp' here when WhatsApp API is configured
+        channels: ['email', 'whatsapp'],
+        // Add SMS later if MSG91 is configured
       })
     } catch (err) {
       // Never let messaging failure break the token creation response
@@ -134,16 +134,16 @@ const createToken = async (req, res) => {
 
 // PATCH /api/tokens/:id/status
 const updateTokenStatus = async (req, res) => {
-  const { id }     = req.params
-  const { status } = req.body
-  const clinicId   = req.user.clinicId
-
-  const validStatuses = ['waiting', 'now', 'paused', 'lab', 'served', 'cancelled']
-  if (!validStatuses.includes(status)) {
-    return error(res, 'Invalid status', 400)
-  }
-
   try {
+    const { id }     = req.params
+    const { status } = req.body
+    const clinicId   = req.user.clinicId
+
+    const validStatuses = ['waiting', 'now', 'paused', 'lab', 'served', 'cancelled']
+    if (!validStatuses.includes(status)) {
+      return error(res, 'Invalid status', 400)
+    }
+
     const token = await Token.findOne({ where: { id, clinicId } })
     if (!token) return error(res, 'Token not found', 404)
 
@@ -176,7 +176,7 @@ const updateTokenStatus = async (req, res) => {
             token_number: token.tokenNumber,
             clinic_name:  clinic?.name || 'the clinic',
           },
-          channels: ['email'],
+          channels: ['email', 'whatsapp'],
         })
       } catch (err) {
         console.error('Your turn message trigger failed:', err.message)
@@ -192,9 +192,9 @@ const updateTokenStatus = async (req, res) => {
 
 // DELETE /api/tokens/:id
 const deleteToken = async (req, res) => {
-  const clinicId = req.user.clinicId
-
   try {
+    const clinicId = req.user.clinicId
+
     const token = await Token.findOne({ where: { id: req.params.id, clinicId } })
     if (!token) return error(res, 'Token not found', 404)
 
@@ -210,12 +210,12 @@ const deleteToken = async (req, res) => {
 
 // POST /api/tokens/emergency
 const createEmergencyToken = async (req, res) => {
-  const { patientId, doctorId } = req.body
-  const clinicId = req.user.clinicId
-
-  if (!patientId) return error(res, 'Patient ID is required', 400)
-
   try {
+    const { patientId, doctorId } = req.body
+    const clinicId = req.user.clinicId
+
+    if (!patientId) return error(res, 'Patient ID is required', 400)
+
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 

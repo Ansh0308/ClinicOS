@@ -92,7 +92,7 @@ const recalculatePositions = async (clinicId) => {
             token_number: t.tokenNumber,
             clinic_name:  clinic?.name || 'the clinic',
           },
-          channels: ['email'],
+          channels: ['email', 'whatsapp'],
         })
       } catch (err) {
         console.error('Two before you trigger failed:', err.message)

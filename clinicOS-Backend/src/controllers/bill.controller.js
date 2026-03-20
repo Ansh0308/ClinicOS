@@ -86,7 +86,7 @@ const markPaid = async (req, res) => {
           payment_date:   new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
           clinic_name:    clinic?.name || 'the clinic',
         },
-        channels: ['email'],
+        channels: ['email', 'whatsapp'],
       })
     } catch (err) {
       console.error('Bill receipt message trigger failed:', err.message)

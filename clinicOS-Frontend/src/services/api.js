@@ -59,6 +59,13 @@ export const patientAPI = {
   updateOptIn:  (id, optInMsg)  => api.patch(`/patients/${id}/opt-in`, { optInMsg }),
 }
 
+export const patientPortalAPI = {
+  getDashboard:   () => api.get('/patient/dashboard'),
+  getActiveToken: () => api.get('/patient/token'),
+  getVisits:      () => api.get('/patient/visits'),
+  getBills:       () => api.get('/patient/bills'),
+}
+
 export const tokenAPI = {
   getAll:     ()              => api.get('/tokens'),
   create:     (data)          => api.post('/tokens', data),

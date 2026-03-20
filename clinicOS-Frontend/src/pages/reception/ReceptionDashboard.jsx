@@ -64,6 +64,7 @@ export default function ReceptionDashboard() {
   const [phone, setPhone]                   = useState('')
   const [searching, setSearching]           = useState(false)
   const [patient, setPatient]               = useState(null)
+  const [togglingOptIn, setTogglingOptIn]   = useState(false)
   const [searchDone, setSearchDone]         = useState(false)
   const [showNewForm, setShowNewForm]       = useState(false)
   const [newPatient, setNewPatient]         = useState({ name:'', gender:'', optInMsg: true })
@@ -153,6 +154,22 @@ export default function ReceptionDashboard() {
       addToast(err.response?.data?.error || 'Failed to register patient', 'error')
     } finally {
       setCreatingPatient(false)
+    }
+  }
+
+  // ── Toggle messaging opt-in ───────────────────────────────────
+  const handleToggleOptIn = async () => {
+    if (!patient) return
+    setTogglingOptIn(true)
+    try {
+      const newStatus = !patient.optInMsg
+      await patientAPI.updateOptIn(patient.id, newStatus)
+      setPatient({ ...patient, optInMsg: newStatus })
+      addToast(`Messaging ${newStatus ? 'enabled' : 'disabled'} for ${patient.name || 'patient'}`, 'success')
+    } catch (err) {
+      addToast('Failed to update messaging preference', 'error')
+    } finally {
+      setTogglingOptIn(false)
     }
   }
 
@@ -344,6 +361,25 @@ export default function ReceptionDashboard() {
                         <span className="font-body text-xs text-text-muted">{patient.visitCount} visits</span>
                       </div>
                     </div>
+                  </div>
+
+                  {/* ── Toggle messaging ─────────────────────────────────── */}
+                  <div className="flex items-center justify-between bg-white/50 rounded-xl p-3 mb-3 border border-cream-200">
+                    <div className="flex flex-col">
+                      <span className="font-body text-sm font-semibold text-text-primary">Automated Messages</span>
+                      <span className="font-body text-xs text-text-muted">Send queue and bill updates via WhatsApp/SMS/Email</span>
+                    </div>
+                    <button
+                      onClick={handleToggleOptIn}
+                      disabled={togglingOptIn}
+                      className={`relative w-10 h-6 rounded-full transition-colors disabled:opacity-50 ${
+                        patient.optInMsg ? 'bg-accent-teal' : 'bg-cream-300'
+                      }`}
+                    >
+                      <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${
+                        patient.optInMsg ? 'translate-x-4' : 'translate-x-0'
+                      }`} />
+                    </button>
                   </div>
 
                   {patient.hasActiveToken ? (

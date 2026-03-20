@@ -1,883 +1,923 @@
-Let's build Phase 7 — Messaging Automation.
+That's fine — WhatsApp works exactly the same as email once you add the API key. The code is already there. Let's move to Phase 8 — Patient Portal.
 
 ---
 
 ## What We're Building
 
 ```
-Backend:
-  - Message service (send email, WhatsApp, SMS)
-  - 10 templates from PRD §11
-  - Auto-triggers on token events and bill paid
-  - Message log
-
-Frontend:
-  - Message log table in Admin Dashboard
-  - Opt-out toggle per patient
+/patient
+  ├── Dashboard    → active token + ETA + recent visits + recent bills
+  ├── Queue        → live position tracker with countdown
+  ├── History      → full visit timeline with prescriptions
+  └── Bills        → all bills with receipt download
 ```
 
 ---
 
 ## Backend First
 
-### 1. `server/src/config/messageTemplates.js`
-
-```js
-// All 10 templates from PRD §11
-// Variables use {variable_name} syntax
-// renderTemplate() replaces them with real values
-
-const templates = {
-  token_issued: {
-    subject: 'Your token at {clinic_name}',
-    body: `Hi {patient_name}, your token *T-{token_number}* has been issued at {clinic_name}.
-
-Queue position: #{queue_position}
-Estimated wait: ~{estimated_wait} minutes
-
-We will notify you when it is almost your turn.`,
-  },
-
-  two_before_you: {
-    subject: 'Almost your turn at {clinic_name}',
-    body: `Hi {patient_name}, only *2 patients* are ahead of you at {clinic_name}.
-
-Please make your way to the clinic now.
-Your token: *T-{token_number}*`,
-  },
-
-  your_turn: {
-    subject: 'It is your turn at {clinic_name}',
-    body: `Hi {patient_name}, it is *your turn* now at {clinic_name}!
-
-Please proceed to the consultation room.
-Token: *T-{token_number}*`,
-  },
-
-  bill_receipt: {
-    subject: 'Payment receipt from {clinic_name}',
-    body: `Hi {patient_name}, your payment of *₹{amount}* has been received at {clinic_name}.
-
-Payment method: {payment_method}
-Date: {payment_date}
-
-Thank you for visiting us!`,
-  },
-
-  appointment_confirmed: {
-    subject: 'Appointment confirmed at {clinic_name}',
-    body: `Hi {patient_name}, your appointment at {clinic_name} is confirmed.
-
-Doctor: {doctor_name}
-Date & Time: {appointment_time}
-
-Please arrive 10 minutes early.`,
-  },
-
-  appointment_reminder: {
-    subject: 'Appointment reminder — {clinic_name}',
-    body: `Hi {patient_name}, reminder: you have an appointment at {clinic_name} tomorrow.
-
-Doctor: {doctor_name}
-Time: {appointment_time}
-
-Reply STOP to opt out of reminders.`,
-  },
-
-  appointment_cancelled: {
-    subject: 'Appointment cancelled — {clinic_name}',
-    body: `Hi {patient_name}, your appointment at {clinic_name} on {appointment_time} has been cancelled.
-
-Please contact the clinic to reschedule.`,
-  },
-
-  lab_result_ready: {
-    subject: 'Lab results ready — {clinic_name}',
-    body: `Hi {patient_name}, your lab results are ready at {clinic_name}.
-
-Please visit the clinic or contact us to collect your reports.`,
-  },
-
-  follow_up_reminder: {
-    subject: 'Follow-up reminder — {clinic_name}',
-    body: `Hi {patient_name}, this is a reminder for your follow-up visit at {clinic_name}.
-
-Scheduled date: {follow_up_date}
-Doctor: {doctor_name}
-
-Please call us to confirm your appointment.`,
-  },
-
-  referral_issued: {
-    subject: 'Referral from {clinic_name}',
-    body: `Hi {patient_name}, Dr. {doctor_name} has referred you to {referred_to}.
-
-Appointment details: {appointment_time}
-
-Please carry this message when you visit.`,
-  },
-}
-
-// Replace all {variable} placeholders with actual values
-const renderTemplate = (templateName, variables = {}) => {
-  const template = templates[templateName]
-  if (!template) throw new Error(`Template "${templateName}" not found`)
-
-  let body = template.body
-  let subject = template.subject
-
-  Object.entries(variables).forEach(([key, value]) => {
-    const regex = new RegExp(`\\{${key}\\}`, 'g')
-    body    = body.replace(regex, value ?? '')
-    subject = subject.replace(regex, value ?? '')
-  })
-
-  return { subject, body }
-}
-
-module.exports = { templates, renderTemplate }
-```
-
----
-
-### 2. `server/src/services/message.service.js`
-
-```js
-const transporter    = require('../config/mailer')
-const { renderTemplate } = require('../config/messageTemplates')
-const { MessageLog, Patient } = require('../models')
-require('dotenv').config()
-
-// ── Send email ────────────────────────────────────────────────────
-const sendEmail = async (to, subject, body) => {
-  await transporter.sendMail({
-    from:    process.env.MAIL_FROM,
-    to,
-    subject,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
-        <div style="background: linear-gradient(160deg, #D95570 0%, #A02040 55%, #4E0E20 100%);
-                    padding: 20px 28px; border-radius: 16px 16px 0 0; margin-bottom: 0;">
-          <h2 style="color: white; margin: 0; font-size: 20px;">ClinicOS</h2>
-        </div>
-        <div style="background: #FDFAF4; padding: 28px; border-radius: 0 0 16px 16px;
-                    border: 1px solid #E0D4B5; border-top: none;">
-          <p style="color: #5C3040; font-size: 15px; line-height: 1.7; white-space: pre-line; margin: 0 0 20px;">
-            ${body}
-          </p>
-          <hr style="border: none; border-top: 1px solid #E0D4B5; margin: 20px 0;" />
-          <p style="color: #8A6070; font-size: 12px; margin: 0;">
-            This message was sent by ClinicOS on behalf of your clinic.
-            Reply STOP to opt out.
-          </p>
-        </div>
-      </div>
-    `,
-  })
-}
-
-// ── Send WhatsApp (via Meta Cloud API) ────────────────────────────
-// Falls back to email if WhatsApp not configured
-const sendWhatsApp = async (phone, body) => {
-  const apiKey  = process.env.WHATSAPP_API_KEY
-  const phoneId = process.env.WHATSAPP_PHONE_ID
-
-  if (!apiKey || !phoneId) {
-    // WhatsApp not configured — skip silently in dev
-    console.log(`[WhatsApp - DEV] To: ${phone}\n${body}`)
-    return
-  }
-
-  const axios = require('axios')
-  await axios.post(
-    `https://graph.facebook.com/v18.0/${phoneId}/messages`,
-    {
-      messaging_product: 'whatsapp',
-      to:    phone.startsWith('+') ? phone : `+91${phone}`,
-      type:  'text',
-      text:  { body },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  )
-}
-
-// ── Send SMS (via MSG91) ──────────────────────────────────────────
-const sendSMS = async (phone, body) => {
-  const apiKey  = process.env.MSG91_API_KEY
-  const senderId = process.env.MSG91_SENDER_ID || 'CLINICOS'
-
-  if (!apiKey) {
-    console.log(`[SMS - DEV] To: ${phone}\n${body}`)
-    return
-  }
-
-  const axios = require('axios')
-  await axios.post(
-    'https://api.msg91.com/api/v5/flow/',
-    {
-      template_id:  process.env.MSG91_TEMPLATE_ID,
-      short_url:    '0',
-      realTimeResponse: '1',
-      recipients: [{
-        mobiles: `91${phone}`,
-        message: body,
-      }],
-    },
-    { headers: { authkey: apiKey } }
-  )
-}
-
-// ── Log message to DB ─────────────────────────────────────────────
-const logMessage = async ({ patientId, clinicId, channel, template, status, error }) => {
-  try {
-    await MessageLog.create({
-      patientId,
-      clinicId,
-      channel,
-      template,
-      status: status || 'sent',
-      errorMessage: error || null,
-    })
-  } catch (err) {
-    console.error('Failed to log message:', err.message)
-  }
-}
-
-// ── Main send function ────────────────────────────────────────────
-// This is the single entry point for all outgoing messages
-const sendMessage = async ({
-  patientId,
-  clinicId,
-  templateName,
-  variables,
-  channels = ['email'], // default email only
-}) => {
-  try {
-    // Check patient opt-in
-    const patient = await Patient.findByPk(patientId, {
-      attributes: ['id', 'phone', 'optInMsg'],
-      include: [{ association: 'user', attributes: ['email'] }],
-    })
-
-    if (!patient) {
-      console.error(`sendMessage: patient ${patientId} not found`)
-      return
-    }
-
-    if (!patient.optInMsg) {
-      console.log(`sendMessage: patient ${patientId} has opted out — skipping`)
-      return
-    }
-
-    const { subject, body } = renderTemplate(templateName, variables)
-
-    // Send on each requested channel
-    for (const channel of channels) {
-      try {
-        if (channel === 'email' && patient.user?.email) {
-          await sendEmail(patient.user.email, subject, body)
-          await logMessage({ patientId, clinicId, channel: 'email', template: templateName, status: 'sent' })
-        }
-
-        if (channel === 'whatsapp' && patient.phone) {
-          await sendWhatsApp(patient.phone, body)
-          await logMessage({ patientId, clinicId, channel: 'whatsapp', template: templateName, status: 'sent' })
-        }
-
-        if (channel === 'sms' && patient.phone) {
-          await sendSMS(patient.phone, body)
-          await logMessage({ patientId, clinicId, channel: 'sms', template: templateName, status: 'sent' })
-        }
-      } catch (err) {
-        console.error(`sendMessage: ${channel} failed for patient ${patientId}:`, err.message)
-        await logMessage({ patientId, clinicId, channel, template: templateName, status: 'failed', error: err.message })
-      }
-    }
-  } catch (err) {
-    console.error('sendMessage error:', err.message)
-  }
-}
-
-module.exports = { sendMessage, sendEmail, renderTemplate }
-```
-
----
-
-### 3. Update `server/src/models/messageLog.model.js`
-
-Add `errorMessage` field:
-
-```js
-const { DataTypes } = require('sequelize')
-const sequelize = require('../config/database')
-
-const MessageLog = sequelize.define('MessageLog', {
-  id: {
-    type:         DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey:   true,
-  },
-  patientId: { type: DataTypes.UUID, allowNull: false },
-  clinicId:  { type: DataTypes.UUID, allowNull: false },
-  channel: {
-    type:      DataTypes.ENUM('whatsapp', 'sms', 'email'),
-    allowNull: false,
-  },
-  template:  { type: DataTypes.STRING(100), allowNull: false },
-  status: {
-    type:         DataTypes.ENUM('sent', 'failed', 'delivered'),
-    defaultValue: 'sent',
-  },
-  errorMessage: {
-    type:      DataTypes.TEXT,
-    allowNull: true,
-  },
-  sentAt: {
-    type:         DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-  },
-}, {
-  tableName:  'message_logs',
-  timestamps: true,
-})
-
-module.exports = MessageLog
-```
-
----
-
-### 4. Add message triggers to token controller
-
-Open `server/src/controllers/token.controller.js` and add the message trigger to `createToken` and `updateTokenStatus`:
-
-At the top add:
-
-```js
-const { sendMessage } = require('../services/message.service')
-```
-
-In `createToken`, after the token is created, add:
-
-```js
-// ── Trigger token_issued message ─────────────────────────────────
-try {
-  const clinic = await require('../models').Clinic.findByPk(clinicId, {
-    attributes: ['name'],
-  })
-
-  // Fire and forget — don't await so API responds fast
-  sendMessage({
-    patientId,
-    clinicId,
-    templateName: 'token_issued',
-    variables: {
-      patient_name:    full.patient?.name || 'Patient',
-      token_number:    tokenNumber,
-      clinic_name:     clinic?.name || 'the clinic',
-      queue_position:  waitingCount + 1,
-      estimated_wait:  estimatedWait,
-    },
-    channels: ['email'],
-    // Add 'whatsapp' here when WhatsApp API is configured
-  })
-} catch (err) {
-  // Never let messaging failure break the token creation response
-  console.error('Token message trigger failed:', err.message)
-}
-```
-
-In `updateTokenStatus`, after the token is updated, add the `your_turn` trigger:
-
-```js
-// ── Trigger your_turn message when called ────────────────────────
-if (status === 'now') {
-  try {
-    const clinic = await require('../models').Clinic.findByPk(clinicId, {
-      attributes: ['name'],
-    })
-    sendMessage({
-      patientId: token.patientId,
-      clinicId,
-      templateName: 'your_turn',
-      variables: {
-        patient_name: token.patient?.name || 'Patient',
-        token_number: token.tokenNumber,
-        clinic_name:  clinic?.name || 'the clinic',
-      },
-      channels: ['email'],
-    })
-  } catch (err) {
-    console.error('Your turn message trigger failed:', err.message)
-  }
-}
-```
-
----
-
-### 5. Add bill_receipt trigger to bill controller
-
-Open `server/src/controllers/bill.controller.js` and add at the top:
-
-```js
-const { sendMessage } = require('../services/message.service')
-```
-
-In `markPaid`, after the bill is updated, add:
-
-```js
-// ── Trigger bill_receipt message ──────────────────────────────────
-try {
-  const clinic = await Clinic.findByPk(clinicId, { attributes: ['name'] })
-
-  sendMessage({
-    patientId: bill.patientId,
-    clinicId,
-    templateName: 'bill_receipt',
-    variables: {
-      patient_name:   bill.patient?.name || 'Patient',
-      amount:         Number(bill.total).toLocaleString('en-IN', { minimumFractionDigits: 2 }),
-      payment_method: req.body.paymentMethod?.toUpperCase(),
-      payment_date:   new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
-      clinic_name:    clinic?.name || 'the clinic',
-    },
-    channels: ['email'],
-  })
-} catch (err) {
-  console.error('Bill receipt message trigger failed:', err.message)
-}
-```
-
----
-
-### 6. Add two-before-you trigger
-
-This requires checking queue position after every token update. Add to `recalculatePositions` in `token.service.js`:
-
-```js
-const { sendMessage } = require('./message.service')
-
-// At the end of recalculatePositions, after the loop:
-// Check for position 2 tokens and trigger reminder
-for (const t of waitingTokens) {
-  if (t.queuePosition === 2) {
-    try {
-      const clinic = await require('../models').Clinic.findByPk(t.clinicId, {
-        attributes: ['name'],
-      })
-      sendMessage({
-        patientId:    t.patientId,
-        clinicId:     t.clinicId,
-        templateName: 'two_before_you',
-        variables: {
-          patient_name: t.patient?.name || 'Patient',
-          token_number: t.tokenNumber,
-          clinic_name:  clinic?.name || 'the clinic',
-        },
-        channels: ['email'],
-      })
-    } catch (err) {
-      console.error('Two before you trigger failed:', err.message)
-    }
-  }
-}
-```
-
-But `recalculatePositions` doesn't include Patient association. Update it to include patient name:
-
-```js
-const waitingTokens = await Token.findAll({
-  where: {
-    clinicId,
-    status:    'waiting',
-    createdAt: { [Op.gte]: today },
-  },
-  include: [{ association: 'patient', attributes: ['id', 'name'] }],
-  order:   [['createdAt', 'ASC']],
-})
-```
-
----
-
-### 7. Add opt-out toggle endpoint to patient routes
-
-Open `server/src/controllers/patient.controller.js` and add:
-
-```js
-// PATCH /api/patients/:id/opt-in
-const updateOptIn = async (req, res) => {
-  const { optInMsg } = req.body
-
-  try {
-    const patient = await Patient.findOne({
-      where: { id: req.params.id, clinicId: req.user.clinicId },
-    })
-
-    if (!patient) return error(res, 'Patient not found', 404)
-
-    await patient.update({ optInMsg: !!optInMsg })
-
-    return success(res, { message: `Messaging ${optInMsg ? 'enabled' : 'disabled'} for patient` })
-  } catch (err) {
-    console.error('updateOptIn error:', err.message)
-    return error(res, 'Failed to update opt-in', 500)
-  }
-}
-
-module.exports = {
-  lookupPatient,
-  createPatient,
-  getPatient,
-  getPatientProfile,
-  getPatientVisits,
-  updateOptIn,        // ← add this
-}
-```
-
-Add to `server/src/routes/patient.routes.js`:
-
-```js
-const { lookupPatient, createPatient, getPatient, updateOptIn } = require('../controllers/patient.controller')
-
-router.patch('/:id/opt-in', rbac(['staff', 'admin']), updateOptIn)
-```
-
----
-
-### 8. Message log controller and routes
-
-Create `server/src/controllers/message.controller.js`:
+### 1. `server/src/controllers/patientPortal.controller.js`
 
 ```js
 const { success, error } = require('../utils/apiResponse')
-const { MessageLog, Patient } = require('../models')
+const { Patient, Token, Visit, Bill, User, Clinic } = require('../models')
 const { Op } = require('sequelize')
 
-// GET /api/messages
-const getMessageLogs = async (req, res) => {
-  const { channel, status, limit = 50 } = req.query
-  const clinicId = req.user.clinicId
-
+// ── GET /api/patient/dashboard ────────────────────────────────────
+const getDashboard = async (req, res) => {
   try {
-    const where = { clinicId }
-    if (channel) where.channel = channel
-    if (status)  where.status  = status
-
-    const logs = await MessageLog.findAll({
-      where,
-      include: [{
-        association: 'patient',
-        attributes:  ['id', 'name', 'phone'],
-      }],
-      order: [['sentAt', 'DESC']],
-      limit: parseInt(limit),
+    // Find the patient record linked to this logged-in user
+    const patient = await Patient.findOne({
+      where: { userId: req.userId },
     })
 
-    return success(res, { logs })
-  } catch (err) {
-    console.error('getMessageLogs error:', err.message)
-    return error(res, 'Failed to fetch logs', 500)
-  }
-}
+    if (!patient) {
+      return success(res, {
+        patient:     null,
+        activeToken: null,
+        recentVisits:[],
+        recentBills: [],
+        message: 'No patient profile found. Visit a clinic to register.',
+      })
+    }
 
-// GET /api/messages/stats
-const getMessageStats = async (req, res) => {
-  const clinicId = req.user.clinicId
-  const today    = new Date()
-  today.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
 
-  try {
-    const [total, sent, failed, todayCount] = await Promise.all([
-      MessageLog.count({ where: { clinicId } }),
-      MessageLog.count({ where: { clinicId, status: 'sent' } }),
-      MessageLog.count({ where: { clinicId, status: 'failed' } }),
-      MessageLog.count({ where: { clinicId, sentAt: { [Op.gte]: today } } }),
+    // Run all queries in parallel for speed
+    const [activeToken, recentVisits, recentBills] = await Promise.all([
+      // Active token today
+      Token.findOne({
+        where: {
+          patientId: patient.id,
+          status:    { [Op.in]: ['waiting', 'now', 'paused', 'lab'] },
+          createdAt: { [Op.gte]: today },
+        },
+        include: [
+          { association: 'doctor',  attributes: ['id', 'name'] },
+          { association: 'clinic',  attributes: ['id', 'name'] },
+        ],
+      }),
+
+      // Last 3 visits
+      Visit.findAll({
+        where:   { patientId: patient.id, isComplete: true },
+        include: [{ association: 'doctor', attributes: ['id', 'name'] }],
+        order:   [['createdAt', 'DESC']],
+        limit:   3,
+      }),
+
+      // Last 3 bills
+      Bill.findAll({
+        where:   { patientId: patient.id },
+        include: [{ association: 'clinic', attributes: ['id', 'name'] }],
+        order:   [['createdAt', 'DESC']],
+        limit:   3,
+      }),
     ])
 
-    return success(res, { total, sent, failed, today: todayCount })
+    return success(res, {
+      patient,
+      activeToken,
+      recentVisits,
+      recentBills,
+    })
   } catch (err) {
-    return error(res, 'Failed to fetch stats', 500)
+    console.error('getDashboard error:', err.message)
+    return error(res, 'Failed to fetch dashboard', 500)
   }
 }
 
-module.exports = { getMessageLogs, getMessageStats }
+// ── GET /api/patient/token ────────────────────────────────────────
+const getActiveToken = async (req, res) => {
+  try {
+    const patient = await Patient.findOne({ where: { userId: req.userId } })
+    if (!patient) return success(res, { token: null })
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // Count tokens ahead to get live position
+    const token = await Token.findOne({
+      where: {
+        patientId: patient.id,
+        status:    { [Op.in]: ['waiting', 'now', 'paused', 'lab'] },
+        createdAt: { [Op.gte]: today },
+      },
+      include: [
+        { association: 'doctor', attributes: ['id', 'name'] },
+        { association: 'clinic', attributes: ['id', 'name'] },
+      ],
+    })
+
+    if (!token) return success(res, { token: null })
+
+    // Count how many are ahead in the queue
+    const tokensAhead = await Token.count({
+      where: {
+        clinicId:      token.clinicId,
+        status:        'waiting',
+        queuePosition: { [Op.lt]: token.queuePosition || 999 },
+        createdAt:     { [Op.gte]: today },
+      },
+    })
+
+    return success(res, {
+      token: {
+        ...token.toJSON(),
+        tokensAhead,
+        livePosition: tokensAhead + (token.status === 'waiting' ? 1 : 0),
+      }
+    })
+  } catch (err) {
+    console.error('getActiveToken error:', err.message)
+    return error(res, 'Failed to fetch token', 500)
+  }
+}
+
+// ── GET /api/patient/visits ───────────────────────────────────────
+const getVisitHistory = async (req, res) => {
+  try {
+    const patient = await Patient.findOne({ where: { userId: req.userId } })
+    if (!patient) return success(res, { visits: [] })
+
+    const visits = await Visit.findAll({
+      where:   { patientId: patient.id, isComplete: true },
+      include: [
+        { association: 'doctor', attributes: ['id', 'name'] },
+        { association: 'clinic', attributes: ['id', 'name'] },
+      ],
+      order: [['createdAt', 'DESC']],
+    })
+
+    return success(res, { patient, visits })
+  } catch (err) {
+    console.error('getVisitHistory error:', err.message)
+    return error(res, 'Failed to fetch visits', 500)
+  }
+}
+
+// ── GET /api/patient/bills ────────────────────────────────────────
+const getBillHistory = async (req, res) => {
+  try {
+    const patient = await Patient.findOne({ where: { userId: req.userId } })
+    if (!patient) return success(res, { bills: [] })
+
+    const bills = await Bill.findAll({
+      where:   { patientId: patient.id },
+      include: [{ association: 'clinic', attributes: ['id', 'name'] }],
+      order:   [['createdAt', 'DESC']],
+    })
+
+    return success(res, { bills })
+  } catch (err) {
+    console.error('getBillHistory error:', err.message)
+    return error(res, 'Failed to fetch bills', 500)
+  }
+}
+
+module.exports = { getDashboard, getActiveToken, getVisitHistory, getBillHistory }
 ```
 
-Create `server/src/routes/message.routes.js`:
+---
+
+### 2. `server/src/routes/patientPortal.routes.js`
 
 ```js
 const express = require('express')
 const router  = express.Router()
-const { getMessageLogs, getMessageStats } = require('../controllers/message.controller')
+const {
+  getDashboard,
+  getActiveToken,
+  getVisitHistory,
+  getBillHistory,
+} = require('../controllers/patientPortal.controller')
 const { protect } = require('../middleware/auth.middleware')
 const { rbac }    = require('../middleware/rbac.middleware')
 
-router.use(protect, rbac(['admin', 'staff']))
+router.use(protect, rbac(['patient']))
 
-router.get('/',       getMessageLogs)
-router.get('/stats',  getMessageStats)
+router.get('/dashboard', getDashboard)
+router.get('/token',     getActiveToken)
+router.get('/visits',    getVisitHistory)
+router.get('/bills',     getBillHistory)
 
 module.exports = router
 ```
 
-Mount in `server/index.js`:
+---
+
+### 3. Mount in `server/index.js`
 
 ```js
-app.use('/api/messages', require('./src/routes/message.routes'))
+app.use('/api/patient', require('./src/routes/patientPortal.routes'))
 ```
 
 ---
 
-### 9. Update `server/.env`
-
-Add these optional keys — system works without them (falls back to console.log in dev):
-
-```env
-# WhatsApp Business API (optional for now)
-WHATSAPP_API_KEY=
-WHATSAPP_PHONE_ID=
-
-# MSG91 SMS (optional for now)
-MSG91_API_KEY=
-MSG91_SENDER_ID=CLINICOS
-MSG91_TEMPLATE_ID=
-```
-
----
-
-## Frontend — Message Log
-
-### 10. Update `client/src/services/api.js`
+### 4. Update `client/src/services/api.js`
 
 ```js
-export const messageAPI = {
-  getLogs:  (params) => api.get('/messages',       { params }),
-  getStats: ()       => api.get('/messages/stats'),
-}
-
-export const patientAPI = {
-  lookup:       (phone)         => api.post('/patients/lookup', { phone }),
-  create:       (data)          => api.post('/patients', data),
-  get:          (id)            => api.get(`/patients/${id}`),
-  updateOptIn:  (id, optInMsg)  => api.patch(`/patients/${id}/opt-in`, { optInMsg }),
+export const patientPortalAPI = {
+  getDashboard:   () => api.get('/patient/dashboard'),
+  getActiveToken: () => api.get('/patient/token'),
+  getVisits:      () => api.get('/patient/visits'),
+  getBills:       () => api.get('/patient/bills'),
 }
 ```
 
 ---
 
-### 11. `client/src/pages/admin/MessageLogs.jsx`
+## Frontend
+
+### 5. `client/src/layouts/PatientLayout.jsx`
+
+```jsx
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import {
+  Stethoscope, Home, Activity,
+  FileText, Receipt, LogOut
+} from 'lucide-react'
+
+const NAV = [
+  { to: '/patient',         label: 'Home',    icon: Home,     end: true },
+  { to: '/patient/queue',   label: 'Queue',   icon: Activity },
+  { to: '/patient/history', label: 'History', icon: FileText },
+  { to: '/patient/bills',   label: 'Bills',   icon: Receipt },
+]
+
+export default function PatientLayout() {
+  const { user, logout } = useAuth()
+  const navigate         = useNavigate()
+
+  const handleLogout = () => { logout(); navigate('/') }
+
+  return (
+    <div className="min-h-screen bg-cream-50 flex flex-col max-w-lg mx-auto">
+
+      {/* Topbar */}
+      <header className="nav-gradient px-5 py-4 flex items-center justify-between sticky top-0 z-30">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-accent-yellow rounded-full flex items-center justify-center">
+            <Stethoscope size={16} className="text-crimson-800" />
+          </div>
+          <span className="font-display font-bold text-white text-lg">ClinicOS</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-body text-sm text-white/80">{user?.name?.split(' ')[0]}</span>
+          <button
+            onClick={handleLogout}
+            className="w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center hover:bg-white/20 transition-all"
+          >
+            <LogOut size={14} className="text-white" />
+          </button>
+        </div>
+      </header>
+
+      {/* Page content */}
+      <main className="flex-1 px-4 py-5 pb-24">
+        <Outlet />
+      </main>
+
+      {/* Bottom nav bar — mobile style */}
+      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white border-t border-cream-200 flex z-30">
+        {NAV.map(({ to, label, icon: Icon, end }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            className={({ isActive }) => `
+              flex-1 flex flex-col items-center gap-1 py-3 font-body text-xs font-semibold transition-all
+              ${isActive ? 'text-crimson-500' : 'text-text-muted hover:text-text-body'}
+            `}
+          >
+            {({ isActive }) => (
+              <>
+                <Icon size={20} className={isActive ? 'text-crimson-500' : 'text-text-muted'} />
+                {label}
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
+    </div>
+  )
+}
+```
+
+---
+
+### 6. `client/src/pages/patient/PatientDashboard.jsx`
 
 ```jsx
 import { useState, useEffect } from 'react'
-import { messageAPI } from '../../services/api'
-import { MessageSquare, CheckCircle, XCircle, Mail, Phone, Smartphone } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
+import { patientPortalAPI } from '../../services/api'
+import {
+  Activity, FileText, Receipt,
+  Clock, ChevronRight, Stethoscope
+} from 'lucide-react'
 
-const CHANNEL_CONFIG = {
-  email:    { label: 'Email',    icon: Mail,        color: 'text-accent-sky',     bg: 'bg-accent-sky/10'     },
-  whatsapp: { label: 'WhatsApp', icon: Smartphone,  color: 'text-accent-teal',    bg: 'bg-accent-teal/10'    },
-  sms:      { label: 'SMS',      icon: Phone,       color: 'text-accent-lavender',bg: 'bg-accent-lavender/10'},
-}
-
-const STATUS_CONFIG = {
-  sent:      { label: 'Sent',      color: 'text-accent-teal',  bg: 'bg-accent-teal/10'  },
-  delivered: { label: 'Delivered', color: 'text-accent-teal',  bg: 'bg-accent-teal/10'  },
-  failed:    { label: 'Failed',    color: 'text-accent-coral', bg: 'bg-accent-coral/10' },
-}
-
-const TEMPLATE_LABELS = {
-  token_issued:         'Token Issued',-
-  two_before_you:       '2 Before You',
-  your_turn:            'Your Turn',
-  bill_receipt:         'Bill Receipt',
-  appointment_confirmed:'Appt Confirmed',
-  appointment_reminder: 'Appt Reminder',
-  appointment_cancelled:'Appt Cancelled',
-  lab_result_ready:     'Lab Results',
-  follow_up_reminder:   'Follow-up',
-  referral_issued:      'Referral',
-}
-
-const FILTERS = ['All', 'Email', 'WhatsApp', 'SMS']
-
-export default function MessageLogs() {
-  const [logs, setLogs]         = useState([])
-  const [stats, setStats]       = useState(null)
-  const [loading, setLoading]   = useState(true)
-  const [filter, setFilter]     = useState('All')
-  const [statusFilter, setStatusFilter] = useState('All')
+export default function PatientDashboard() {
+  const { user }              = useAuth()
+  const navigate              = useNavigate()
+  const [data, setData]       = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const params = {}
-    if (filter !== 'All')       params.channel = filter.toLowerCase()
-    if (statusFilter !== 'All') params.status  = statusFilter.toLowerCase()
-
-    Promise.all([
-      messageAPI.getLogs(params),
-      messageAPI.getStats(),
-    ])
-      .then(([logsRes, statsRes]) => {
-        setLogs(logsRes.data.data.logs)
-        setStats(statsRes.data.data)
-      })
+    patientPortalAPI.getDashboard()
+      .then(res => setData(res.data.data))
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [filter, statusFilter])
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="h-6 bg-cream-200 rounded w-1/2" />
+        <div className="card h-40" />
+        <div className="card h-32" />
+      </div>
+    )
+  }
+
+  const { activeToken, recentVisits, recentBills } = data || {}
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="font-display font-bold text-3xl text-text-primary">
-          Message Logs
+    <div className="space-y-5">
+
+      {/* Greeting */}
+      <div>
+        <h1 className="font-display font-bold text-2xl text-text-primary">
+          Hi, {user?.name?.split(' ')[0]} 👋
         </h1>
-        <p className="font-body text-text-muted mt-1">
-          All automated messages sent to patients
+        <p className="font-body text-sm text-text-muted">
+          Welcome to your health dashboard
         </p>
       </div>
 
-      {/* Stats cards */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          {[
-            { label: 'Total Sent',    value: stats.total,   color: 'text-crimson-500',  bg: 'bg-crimson-100'    },
-            { label: 'Successful',    value: stats.sent,    color: 'text-accent-teal',  bg: 'bg-accent-teal/10' },
-            { label: 'Failed',        value: stats.failed,  color: 'text-accent-coral', bg: 'bg-accent-coral/10'},
-            { label: 'Today',         value: stats.today,   color: 'text-accent-sky',   bg: 'bg-accent-sky/10'  },
-          ].map(s => (
-            <div key={s.label} className="card py-4 text-center">
-              <p className={`font-display font-bold text-2xl ${s.color}`}>{s.value}</p>
-              <p className="font-body text-xs text-text-muted">{s.label}</p>
+      {/* Active Token Card */}
+      {activeToken ? (
+        <div
+          className="nav-gradient rounded-3xl p-5 cursor-pointer"
+          onClick={() => navigate('/patient/queue')}
+        >
+          <p className="font-body text-xs text-white/60 uppercase tracking-wider mb-1">
+            Active Queue Token
+          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-display font-bold text-5xl text-white">
+                T-{activeToken.tokenNumber}
+              </p>
+              <p className="font-body text-sm text-white/80 mt-1">
+                {activeToken.clinic?.name}
+              </p>
+              {activeToken.doctor && (
+                <p className="font-body text-xs text-white/60">
+                  Dr. {activeToken.doctor.name}
+                </p>
+              )}
             </div>
-          ))}
+            <div className="text-right">
+              <div className={`inline-block px-3 py-1.5 rounded-pill font-body text-xs font-bold mb-2
+                ${activeToken.status === 'now'
+                  ? 'bg-accent-yellow text-crimson-900 animate-pulse'
+                  : 'bg-white/20 text-white'
+                }`}>
+                {activeToken.status === 'now'
+                  ? '🎉 Your Turn!'
+                  : activeToken.status === 'paused'
+                  ? 'On Hold'
+                  : activeToken.status === 'lab'
+                  ? 'In Lab'
+                  : `#${activeToken.queuePosition} in queue`
+                }
+              </div>
+              {activeToken.estimatedWait > 0 && activeToken.status === 'waiting' && (
+                <p className="font-body text-xs text-white/70 flex items-center gap-1 justify-end">
+                  <Clock size={11} />
+                  ~{activeToken.estimatedWait} min wait
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 mt-3 text-white/60 font-body text-xs">
+            <span>Tap to track live queue</span>
+            <ChevronRight size={12} />
+          </div>
+        </div>
+      ) : (
+        <div className="card border-2 border-dashed border-cream-300 text-center py-8">
+          <Activity size={28} className="text-cream-400 mx-auto mb-2" />
+          <p className="font-body font-semibold text-sm text-text-body mb-0.5">
+            No active queue token
+          </p>
+          <p className="font-body text-xs text-text-muted">
+            Visit a clinic to get a token
+          </p>
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <div className="flex gap-1">
-          {FILTERS.map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-pill font-body text-xs font-semibold transition-all
-                ${filter === f
-                  ? 'bg-crimson-800 text-white'
-                  : 'bg-white border border-cream-300 text-text-body hover:border-crimson-300'
-                }`}
-            >
-              {f}
-            </button>
-          ))}
+      {/* Recent Visits */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="font-body text-sm font-bold text-text-secondary">
+            Recent Visits
+          </p>
+          <button
+            onClick={() => navigate('/patient/history')}
+            className="font-body text-xs text-crimson-500 font-semibold hover:text-crimson-700"
+          >
+            View all
+          </button>
         </div>
-        <div className="flex gap-1">
-          {['All', 'Sent', 'Failed'].map(s => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-pill font-body text-xs font-semibold transition-all
-                ${statusFilter === s
-                  ? 'bg-crimson-800 text-white'
-                  : 'bg-white border border-cream-300 text-text-body hover:border-crimson-300'
-                }`}
-            >
-              {s}
-            </button>
+
+        {recentVisits?.length === 0 ? (
+          <div className="card text-center py-6">
+            <Stethoscope size={24} className="text-cream-400 mx-auto mb-2" />
+            <p className="font-body text-sm text-text-muted">No visits yet</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {recentVisits?.map(visit => (
+              <div
+                key={visit.id}
+                onClick={() => navigate('/patient/history')}
+                className="card flex items-center gap-3 cursor-pointer hover:shadow-hero transition-shadow py-3"
+              >
+                <div className="w-10 h-10 bg-crimson-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <Stethoscope size={16} className="text-crimson-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-body font-semibold text-sm text-text-primary truncate">
+                    {visit.complaint || 'Consultation'}
+                  </p>
+                  <p className="font-body text-xs text-text-muted">
+                    {visit.doctor?.name} · {new Date(visit.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
+                  </p>
+                </div>
+                <ChevronRight size={14} className="text-text-muted flex-shrink-0" />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Recent Bills */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="font-body text-sm font-bold text-text-secondary">
+            Recent Bills
+          </p>
+          <button
+            onClick={() => navigate('/patient/bills')}
+            className="font-body text-xs text-crimson-500 font-semibold hover:text-crimson-700"
+          >
+            View all
+          </button>
+        </div>
+
+        {recentBills?.length === 0 ? (
+          <div className="card text-center py-6">
+            <Receipt size={24} className="text-cream-400 mx-auto mb-2" />
+            <p className="font-body text-sm text-text-muted">No bills yet</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {recentBills?.map(bill => (
+              <div
+                key={bill.id}
+                onClick={() => navigate('/patient/bills')}
+                className="card flex items-center gap-3 cursor-pointer hover:shadow-hero transition-shadow py-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="font-body font-semibold text-sm text-text-primary">
+                    {bill.clinic?.name}
+                  </p>
+                  <p className="font-body text-xs text-text-muted">
+                    {new Date(bill.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}
+                  </p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="font-body font-bold text-sm text-text-primary">
+                    ₹{Number(bill.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </p>
+                  <span className={`font-body text-xs font-bold px-2 py-0.5 rounded-pill
+                    ${bill.status === 'paid'
+                      ? 'bg-accent-teal/10 text-accent-teal'
+                      : 'bg-accent-yellow/10 text-amber-600'
+                    }`}>
+                    {bill.status === 'paid' ? 'Paid' : 'Unpaid'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+```
+
+---
+
+### 7. `client/src/pages/patient/QueueTracker.jsx`
+
+```jsx
+import { useState, useEffect, useCallback } from 'react'
+import { patientPortalAPI } from '../../services/api'
+import { Activity, Clock, CheckCircle, FlaskConical, Pause } from 'lucide-react'
+
+const STATUS_UI = {
+  waiting: {
+    emoji:   '⏳',
+    label:   'Waiting',
+    message: 'Please wait — we will notify you when your turn is near',
+    color:   'text-text-body',
+    bg:      'bg-cream-100',
+  },
+  now: {
+    emoji:   '🎉',
+    label:   'Your Turn!',
+    message: 'Please proceed to the consultation room now',
+    color:   'text-accent-teal',
+    bg:      'bg-accent-teal/10',
+  },
+  paused: {
+    emoji:   '⏸️',
+    label:   'On Hold',
+    message: 'Your token has been put on hold by the clinic',
+    color:   'text-accent-peach',
+    bg:      'bg-accent-peach/10',
+  },
+  lab: {
+    emoji:   '🔬',
+    label:   'In Lab',
+    message: 'Please proceed to the lab for your tests',
+    color:   'text-accent-sky',
+    bg:      'bg-accent-sky/10',
+  },
+}
+
+export default function QueueTracker() {
+  const [tokenData, setTokenData] = useState(null)
+  const [loading, setLoading]     = useState(true)
+  const [lastUpdated, setLastUpdated] = useState(null)
+
+  const fetchToken = useCallback(async () => {
+    try {
+      const res = await patientPortalAPI.getActiveToken()
+      setTokenData(res.data.data.token)
+      setLastUpdated(new Date())
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchToken()
+    // Poll every 20 seconds for live updates
+    const interval = setInterval(fetchToken, 20000)
+    return () => clearInterval(interval)
+  }, [fetchToken])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <span className="w-6 h-6 border-2 border-crimson-300 border-t-crimson-600 rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!tokenData) {
+    return (
+      <div className="text-center py-20">
+        <Activity size={48} className="text-cream-300 mx-auto mb-4" />
+        <h2 className="font-display font-bold text-2xl text-text-primary mb-2">
+          No Active Token
+        </h2>
+        <p className="font-body text-sm text-text-muted">
+          You don't have an active queue token today.
+          Visit a clinic to get one.
+        </p>
+      </div>
+    )
+  }
+
+  const ui = STATUS_UI[tokenData.status] || STATUS_UI.waiting
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="font-display font-bold text-2xl text-text-primary">
+          Live Queue
+        </h1>
+        <p className="font-body text-sm text-text-muted">
+          {tokenData.clinic?.name}
+          {tokenData.doctor && ` · Dr. ${tokenData.doctor.name}`}
+        </p>
+      </div>
+
+      {/* Main token display */}
+      <div className={`rounded-3xl p-6 text-center ${ui.bg} border-2 border-current/10`}>
+        <p className="text-5xl mb-2">{ui.emoji}</p>
+        <p className={`font-body text-sm font-bold uppercase tracking-widest mb-2 ${ui.color}`}>
+          {ui.label}
+        </p>
+        <p className="font-display font-bold text-8xl text-text-primary mb-1">
+          T-{tokenData.tokenNumber}
+        </p>
+        <p className="font-body text-sm text-text-muted">{ui.message}</p>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="card text-center py-4">
+          <p className="font-body text-xs text-text-muted mb-1 flex items-center justify-center gap-1">
+            <Activity size={12} /> Position
+          </p>
+          <p className="font-display font-bold text-3xl text-crimson-500">
+            {tokenData.status === 'now'
+              ? '🎉'
+              : `#${tokenData.livePosition || tokenData.queuePosition || '—'}`
+            }
+          </p>
+        </div>
+        <div className="card text-center py-4">
+          <p className="font-body text-xs text-text-muted mb-1 flex items-center justify-center gap-1">
+            <Clock size={12} /> Est. Wait
+          </p>
+          <p className="font-display font-bold text-3xl text-accent-teal">
+            {tokenData.status === 'now'
+              ? 'Now'
+              : tokenData.estimatedWait > 0
+              ? `${tokenData.estimatedWait}m`
+              : '—'
+            }
+          </p>
+        </div>
+      </div>
+
+      {/* Tokens ahead */}
+      {tokenData.status === 'waiting' && tokenData.tokensAhead >= 0 && (
+        <div className="card">
+          <p className="font-body text-sm text-text-muted text-center">
+            {tokenData.tokensAhead === 0
+              ? '✨ You are next in line!'
+              : tokenData.tokensAhead === 1
+              ? '1 patient ahead of you'
+              : `${tokenData.tokensAhead} patients ahead of you`
+            }
+          </p>
+
+          {/* Visual queue dots */}
+          <div className="flex gap-1.5 justify-center mt-3 flex-wrap">
+            {Array.from({ length: Math.min(tokenData.tokensAhead + 1, 10) }).map((_, i) => (
+              <div
+                key={i}
+                className={`w-3 h-3 rounded-full transition-all
+                  ${i < tokenData.tokensAhead ? 'bg-cream-300' : 'bg-crimson-500 scale-125'}`}
+              />
+            ))}
+            {tokenData.tokensAhead > 9 && (
+              <span className="font-body text-xs text-text-muted">+{tokenData.tokensAhead - 9} more</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Status steps */}
+      <div className="card">
+        <p className="font-body text-xs font-bold uppercase tracking-wider text-text-muted mb-4">
+          Your Journey
+        </p>
+        <div className="space-y-3">
+          {[
+            { icon: CheckCircle, label: 'Token issued',         done: true },
+            { icon: Clock,       label: 'Waiting in queue',     done: ['now','served','lab'].includes(tokenData.status), active: tokenData.status === 'waiting' },
+            { icon: Activity,    label: 'Called by doctor',     done: ['served'].includes(tokenData.status),             active: tokenData.status === 'now'     },
+            { icon: FlaskConical,label: 'Lab tests (if needed)',done: false,                                             active: tokenData.status === 'lab'     },
+            { icon: CheckCircle, label: 'Consultation complete',done: false },
+          ].map(({ icon: Icon, label, done, active }) => (
+            <div key={label} className="flex items-center gap-3">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0
+                ${done   ? 'bg-accent-teal text-white'      : ''}
+                ${active ? 'bg-crimson-500 text-white animate-pulse' : ''}
+                ${!done && !active ? 'bg-cream-200 text-text-muted'  : ''}
+              `}>
+                <Icon size={13} />
+              </div>
+              <p className={`font-body text-sm
+                ${done   ? 'text-accent-teal font-semibold line-through' : ''}
+                ${active ? 'text-crimson-600 font-bold'                  : ''}
+                ${!done && !active ? 'text-text-muted'                   : ''}
+              `}>
+                {label}
+              </p>
+            </div>
           ))}
         </div>
       </div>
 
-      {/* Logs table */}
-      {loading ? (
-        <div className="space-y-2">
-          {[1,2,3,4,5].map(i => (
-            <div key={i} className="card h-16 animate-pulse" />
-          ))}
-        </div>
-      ) : logs.length === 0 ? (
+      {/* Last updated */}
+      {lastUpdated && (
+        <p className="font-body text-xs text-text-muted text-center">
+          Updates every 20 seconds · Last checked {lastUpdated.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}
+        </p>
+      )}
+    </div>
+  )
+}
+```
+
+---
+
+### 8. `client/src/pages/patient/VisitHistory.jsx`
+
+```jsx
+import { useState, useEffect } from 'react'
+import { patientPortalAPI } from '../../services/api'
+import { Stethoscope, ChevronDown, ChevronUp, Pill, FlaskConical, Calendar } from 'lucide-react'
+
+export default function VisitHistory() {
+  const [data, setData]         = useState(null)
+  const [loading, setLoading]   = useState(true)
+  const [expanded, setExpanded] = useState(null)
+
+  useEffect(() => {
+    patientPortalAPI.getVisits()
+      .then(res => setData(res.data.data))
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="space-y-3 animate-pulse">
+        <div className="h-6 bg-cream-200 rounded w-1/3" />
+        {[1,2,3].map(i => <div key={i} className="card h-20" />)}
+      </div>
+    )
+  }
+
+  const { visits = [] } = data || {}
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="font-display font-bold text-2xl text-text-primary">
+          Visit History
+        </h1>
+        <p className="font-body text-sm text-text-muted">
+          {visits.length} consultation{visits.length !== 1 ? 's' : ''} recorded
+        </p>
+      </div>
+
+      {visits.length === 0 ? (
         <div className="card text-center py-16">
-          <MessageSquare size={40} className="text-cream-400 mx-auto mb-3" />
+          <Stethoscope size={40} className="text-cream-400 mx-auto mb-3" />
           <p className="font-display font-bold text-xl text-text-primary mb-1">
-            No messages yet
+            No visits yet
           </p>
           <p className="font-body text-sm text-text-muted">
-            Messages will appear here when tokens are issued and bills are paid
+            Your consultation history will appear here after your first visit
           </p>
         </div>
       ) : (
-        <div className="card p-0 overflow-hidden">
-          {/* Table header */}
-          <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-cream-100 border-b border-cream-200">
-            {['Patient', 'Template', 'Channel', 'Status', 'Time'].map((h, i) => (
-              <p key={h} className={`font-body text-xs font-bold text-text-muted uppercase tracking-wider
-                ${i === 0 ? 'col-span-3' : i === 1 ? 'col-span-3' : i === 2 ? 'col-span-2' : i === 3 ? 'col-span-2' : 'col-span-2'}`}>
-                {h}
-              </p>
-            ))}
-          </div>
+        <div className="space-y-3">
+          {visits.map(visit => (
+            <div key={visit.id} className="card p-0 overflow-hidden">
 
-          {/* Rows */}
-          <div className="divide-y divide-cream-100">
-            {logs.map(log => {
-              const channel = CHANNEL_CONFIG[log.channel]  || CHANNEL_CONFIG.email
-              const status  = STATUS_CONFIG[log.status]    || STATUS_CONFIG.sent
-              const CIcon   = channel.icon
-
-              return (
-                <div key={log.id} className="grid grid-cols-12 gap-2 px-4 py-3 hover:bg-cream-50 transition-colors items-center">
-                  {/* Patient */}
-                  <div className="col-span-3 min-w-0">
-                    <p className="font-body text-sm font-semibold text-text-primary truncate">
-                      {log.patient?.name || 'Patient'}
-                    </p>
-                    <p className="font-body text-xs text-text-muted">{log.patient?.phone}</p>
-                  </div>
-
-                  {/* Template */}
-                  <div className="col-span-3">
-                    <span className="font-body text-xs font-semibold bg-cream-100 text-text-body px-2 py-0.5 rounded-pill">
-                      {TEMPLATE_LABELS[log.template] || log.template}
-                    </span>
-                  </div>
-
-                  {/* Channel */}
-                  <div className="col-span-2">
-                    <span className={`flex items-center gap-1 font-body text-xs font-semibold px-2 py-0.5 rounded-pill w-fit ${channel.bg} ${channel.color}`}>
-                      <CIcon size={11} />
-                      {channel.label}
-                    </span>
-                  </div>
-
-                  {/* Status */}
-                  <div className="col-span-2">
-                    <span className={`flex items-center gap-1 font-body text-xs font-semibold px-2 py-0.5 rounded-pill w-fit ${status.bg} ${status.color}`}>
-                      {log.status === 'failed'
-                        ? <XCircle size={11} />
-                        : <CheckCircle size={11} />
-                      }
-                      {status.label}
-                    </span>
-                  </div>
-
-                  {/* Time */}
-                  <div className="col-span-2">
-                    <p className="font-body text-xs text-text-muted">
-                      {new Date(log.sentAt).toLocaleTimeString('en-IN', {
-                        hour: '2-digit', minute: '2-digit',
-                      })}
-                    </p>
-                    <p className="font-body text-xs text-text-muted">
-                      {new Date(log.sentAt).toLocaleDateString('en-IN', {
-                        day: 'numeric', month: 'short',
-                      })}
-                    </p>
-                  </div>
+              {/* Visit header */}
+              <button
+                className="w-full px-4 py-4 flex items-start gap-3 text-left hover:bg-cream-50 transition-colors"
+                onClick={() => setExpanded(expanded === visit.id ? null : visit.id)}
+              >
+                <div className="w-10 h-10 bg-crimson-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+                  <Stethoscope size={16} className="text-crimson-500" />
                 </div>
-              )
-            })}
-          </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-body font-bold text-sm text-text-primary">
+                    {visit.complaint || 'Consultation'}
+                  </p>
+                  <p className="font-body text-xs text-text-muted mt-0.5">
+                    Dr. {visit.doctor?.name}
+                    {' · '}
+                    {new Date(visit.createdAt).toLocaleDateString('en-IN', {
+                      day: 'numeric', month: 'short', year: 'numeric'
+                    })}
+                  </p>
+                  {/* Complaint tags */}
+                  {visit.complaintTags?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {visit.complaintTags.slice(0, 3).map(tag => (
+                        <span key={tag} className="font-body text-xs bg-crimson-100 text-crimson-600 px-2 py-0.5 rounded-pill">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {expanded === visit.id
+                  ? <ChevronUp size={16} className="text-text-muted flex-shrink-0 mt-1" />
+                  : <ChevronDown size={16} className="text-text-muted flex-shrink-0 mt-1" />
+                }
+              </button>
+
+              {/* Expanded visit details */}
+              {expanded === visit.id && (
+                <div className="px-4 pb-4 space-y-4 border-t border-cream-100">
+
+                  {/* Diagnosis */}
+                  {visit.diagnosis && (
+                    <div className="pt-3">
+                      <p className="font-body text-xs font-bold uppercase tracking-wider text-text-muted mb-1">
+                        Diagnosis
+                      </p>
+                      <p className="font-body text-sm text-text-body bg-cream-50 rounded-xl px-3 py-2">
+                        {visit.diagnosis}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Prescriptions */}
+                  {visit.prescriptions?.length > 0 && (
+                    <div>
+                      <p className="font-body text-xs font-bold uppercase tracking-wider text-text-muted mb-2 flex items-center gap-1">
+                        <Pill size={11} /> Prescriptions
+                      </p>
+                      <div className="space-y-1.5">
+                        {visit.prescriptions.map((rx, i) => (
+                          <div key={i} className="bg-cream-50 rounded-xl px-3 py-2">
+                            <p className="font-body text-sm font-bold text-text-primary">
+                              {rx.name}
+                            </p>
+                            <p className="font-body text-xs text-text-muted">
+                              {[rx.dose, rx.frequency, rx.duration].filter(Boolean).join(' · ')}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tests */}
+                  {visit.testsOrdered?.length > 0 && (
+                    <div>
+                      <p className="font-body text-xs font-bold uppercase tracking-wider text-text-muted mb-2 flex items-center gap-1">
+                        <FlaskConical size={11} /> Tests Ordered
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {visit.testsOrdered.map(test => (
+                          <span key={test} className="font-body text-xs bg-accent-sky/10 text-accent-sky px-2.5 py-1 rounded-pill">
+                            {test}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Follow-up */}
+                  {visit.followUpDate && (
+                    <div className="flex items-center gap-2 bg-accent-yellow/10 border border-accent-yellow/30 rounded-xl px-3 py-2">
+                      <Calendar size={14} className="text-amber-600 flex-shrink-0" />
+                      <p className="font-body text-sm text-text-body">
+                        Follow-up:{' '}
+                        <strong>
+                          {new Date(visit.followUpDate).toLocaleDateString('en-IN', {
+                            day: 'numeric', month: 'long', year: 'numeric'
+                          })}
+                        </strong>
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Vitals */}
+                  {visit.vitals && Object.values(visit.vitals).some(Boolean) && (
+                    <div>
+                      <p className="font-body text-xs font-bold uppercase tracking-wider text-text-muted mb-2">
+                        Vitals
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(visit.vitals).filter(([,v]) => v).map(([k, v]) => (
+                          <div key={k} className="bg-cream-50 rounded-xl px-3 py-2">
+                            <p className="font-body text-xs text-text-muted capitalize">{k === 'bp' ? 'Blood Pressure' : k}</p>
+                            <p className="font-body text-sm font-bold text-text-primary">{v}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -887,36 +927,178 @@ export default function MessageLogs() {
 
 ---
 
-### 12. Add Message Logs to Admin routes
-
-Update `client/src/layouts/AdminLayout.jsx` — add Messages to nav:
+### 9. `client/src/pages/patient/BillHistory.jsx`
 
 ```jsx
-// Add to NAV_ITEMS array:
-import { LayoutDashboard, Users, UserCheck, Settings, MessageSquare } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { patientPortalAPI } from '../../services/api'
+import { Receipt, CheckCircle, Clock } from 'lucide-react'
 
-const NAV_ITEMS = [
-  { to: '/admin',           label: 'Overview',      icon: LayoutDashboard, end: true },
-  { to: '/admin/requests',  label: 'Join Requests', icon: UserCheck },
-  { to: '/admin/team',      label: 'Team',          icon: Users },
-  { to: '/admin/messages',  label: 'Messages',      icon: MessageSquare },  // ← add
-  { to: '/admin/settings',  label: 'Settings',      icon: Settings },
-]
-```
+export default function BillHistory() {
+  const [bills, setBills]     = useState([])
+  const [loading, setLoading] = useState(true)
 
-Update `client/src/App.jsx`:
+  useEffect(() => {
+    patientPortalAPI.getBills()
+      .then(res => setBills(res.data.data.bills))
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
 
-```jsx
-// Add import
-import MessageLogs from './pages/admin/MessageLogs'
+  if (loading) {
+    return (
+      <div className="space-y-3 animate-pulse">
+        <div className="h-6 bg-cream-200 rounded w-1/3" />
+        {[1,2,3].map(i => <div key={i} className="card h-20" />)}
+      </div>
+    )
+  }
 
-// Add inside the /admin nested routes:
-<Route path="messages" element={<MessageLogs />} />
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="font-display font-bold text-2xl text-text-primary">Bills</h1>
+        <p className="font-body text-sm text-text-muted">
+          {bills.length} bill{bills.length !== 1 ? 's' : ''} total
+        </p>
+      </div>
+
+      {bills.length === 0 ? (
+        <div className="card text-center py-16">
+          <Receipt size={40} className="text-cream-400 mx-auto mb-3" />
+          <p className="font-display font-bold text-xl text-text-primary mb-1">No bills yet</p>
+          <p className="font-body text-sm text-text-muted">Your bills will appear here after consultations</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {bills.map(bill => (
+            <div key={bill.id} className="card">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="font-body font-bold text-sm text-text-primary">
+                    {bill.clinic?.name}
+                  </p>
+                  <p className="font-body text-xs text-text-muted mt-0.5">
+                    {new Date(bill.createdAt).toLocaleDateString('en-IN', {
+                      day: 'numeric', month: 'long', year: 'numeric'
+                    })}
+                  </p>
+
+                  {/* Items summary */}
+                  <div className="mt-2 space-y-0.5">
+                    {bill.items?.slice(0, 2).map((item, i) => (
+                      <p key={i} className="font-body text-xs text-text-muted">
+                        {item.name} × {item.quantity}
+                        <span className="ml-2">₹{Number(item.lineTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      </p>
+                    ))}
+                    {bill.items?.length > 2 && (
+                      <p className="font-body text-xs text-text-muted">
+                        +{bill.items.length - 2} more items
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-right ml-4">
+                  <p className="font-display font-bold text-lg text-text-primary">
+                    ₹{Number(bill.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </p>
+                  <span className={`inline-flex items-center gap-1 font-body text-xs font-bold px-2 py-0.5 rounded-pill mt-1
+                    ${bill.status === 'paid'
+                      ? 'bg-accent-teal/10 text-accent-teal'
+                      : 'bg-accent-yellow/10 text-amber-600'
+                    }`}>
+                    {bill.status === 'paid'
+                      ? <><CheckCircle size={11} /> Paid</>
+                      : <><Clock size={11} /> Unpaid</>
+                    }
+                  </span>
+                  {bill.paymentMethod && (
+                    <p className="font-body text-xs text-text-muted mt-1 capitalize">
+                      via {bill.paymentMethod}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 ```
 
 ---
 
-## Restart and Test
+### 10. Update `client/src/App.jsx`
+
+```jsx
+// Add imports
+import PatientLayout    from './layouts/PatientLayout'
+import PatientDashboard from './pages/patient/PatientDashboard'
+import QueueTracker     from './pages/patient/QueueTracker'
+import VisitHistory     from './pages/patient/VisitHistory'
+import BillHistory      from './pages/patient/BillHistory'
+
+// Replace the /patient route with nested routes:
+<Route path="/patient" element={
+  <ProtectedRoute allowedRoles={['patient']}>
+    <PatientLayout />
+  </ProtectedRoute>
+}>
+  <Route index           element={<PatientDashboard />} />
+  <Route path="queue"    element={<QueueTracker />} />
+  <Route path="history"  element={<VisitHistory />} />
+  <Route path="bills"    element={<BillHistory />} />
+</Route>
+```
+
+Also create `client/src/pages/patient/` folder.
+
+---
+
+## Important — Patient Must Have a `userId`
+
+The patient portal works by finding a `Patient` record where `userId = logged-in user's id`. This means patients who registered through the patient signup flow will have a `userId` linked. But patients registered by staff at reception (walk-ins) have `userId = null`.
+
+For the portal to work for a patient, they need to have signed up through `/signup/patient` and their phone number must match a patient record in the clinic.
+
+**Add a link step** — when a patient signs up, after registration, check if their phone already exists as a walk-in patient and link them:
+
+In `server/src/services/auth.service.js`, after the patient user is created, add:
+
+```js
+// Link to existing walk-in patient record if phone matches
+if (role === 'patient' && phone) {
+  const existingPatient = await Patient.findOne({ where: { phone } })
+  if (existingPatient && !existingPatient.userId) {
+    await existingPatient.update({ userId: user.id })
+  } else if (!existingPatient) {
+    // Create a patient record for them (they can be added to any clinic later)
+    await Patient.create({
+      userId: user.id,
+      phone,
+      name,
+      clinicId: null, // will be set when they visit a clinic
+    })
+  }
+}
+```
+
+Wait — `clinicId` is required (allowNull: false) in the Patient model. Update `patient.model.js`:
+
+```js
+clinicId: {
+  type:      DataTypes.UUID,
+  allowNull: true,   // ← change to true for patient portal signups
+},
+```
+
+---
+
+## Restart Both Servers
 
 ```bash
 cd server && npm run dev
@@ -927,25 +1109,16 @@ cd client && npm run dev
 
 ## Test Checklist
 
-**Email triggers (check your Gmail inbox):**
-- [ ] Issue a token for a patient who has a User account with email → check inbox for `token_issued` email
-- [ ] Call that patient (mark as "Now") → check inbox for `your_turn` email
-- [ ] Create and pay a bill → check inbox for `bill_receipt` email
-- [ ] When a token moves to position 2 → `two_before_you` email arrives
+- [ ] Login as patient → lands on `/patient` dashboard
+- [ ] If patient has active token → big token card shown with queue position
+- [ ] Click token card → goes to `/patient/queue`
+- [ ] Queue tracker shows position, ETA, tokens ahead, journey steps
+- [ ] Updates every 20 seconds without page refresh
+- [ ] When staff calls patient (marks "Now") → status changes to "Your Turn 🎉"
+- [ ] `/patient/history` → list of completed visits
+- [ ] Click any visit → expands with diagnosis, prescriptions, tests, follow-up
+- [ ] `/patient/bills` → list of all bills with paid/unpaid badge
+- [ ] Bottom navigation works between all 4 tabs
+- [ ] Sign out → back to homepage
 
-**Message log in admin:**
-- [ ] Login as admin → `/admin/messages` → see all sent messages
-- [ ] Stats cards show Total Sent, Successful, Failed, Today counts
-- [ ] Filter by Email / WhatsApp / SMS works
-- [ ] Filter by Sent / Failed works
-- [ ] Each row shows patient name, template, channel badge, status badge, time
-
-**Opt-out:**
-- [ ] Patients with `optInMsg = false` receive no messages (check server terminal — "opted out" log appears)
-
-**Dev mode (no WhatsApp/SMS configured):**
-- [ ] WhatsApp messages print to server terminal instead of sending
-- [ ] SMS messages print to server terminal instead of sending
-- [ ] No crashes when WhatsApp/SMS keys are empty
-
-Tell me when Phase 7 is working and we move to Phase 8 — Patient Portal.
+Tell me when Phase 8 is working and we move to Phase 9 — Admin Analytics.

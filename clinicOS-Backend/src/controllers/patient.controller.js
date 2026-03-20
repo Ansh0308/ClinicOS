@@ -35,13 +35,13 @@ const buildPatientResponse = async (patient, clinicId) => {
 
 // POST /api/patients/lookup
 const lookupPatient = async (req, res) => {
-  let { phone } = req.body
-  const clinicId  = req.user.clinicId
-
-  if (!phone) return error(res, 'Phone number is required', 400)
-  phone = phone.toString().replace(/\D/g, '').slice(0, 10)
-
   try {
+    let { phone } = req.body
+    const clinicId  = req.user.clinicId
+
+    if (!phone) return error(res, 'Phone number is required', 400)
+    phone = phone.toString().replace(/\D/g, '').slice(0, 10)
+
     // ── Stage 1: check patients table (walk-in / reception-registered) ───────
     let patient = await Patient.findOne({
       where: { phone, clinicId },
@@ -82,13 +82,13 @@ const lookupPatient = async (req, res) => {
 
 // POST /api/patients
 const createPatient = async (req, res) => {
-  let { phone, name, dob, gender, optInMsg } = req.body
-  const clinicId = req.user.clinicId
-
-  if (!phone) return error(res, 'Phone number is required', 400)
-  phone = phone.toString().replace(/\D/g, '').slice(0, 10)
-
   try {
+    let { phone, name, dob, gender, optInMsg } = req.body
+    const clinicId = req.user.clinicId
+
+    if (!phone) return error(res, 'Phone number is required', 400)
+    phone = phone.toString().replace(/\D/g, '').slice(0, 10)
+
     // Check not already registered in this clinic
     const existing = await Patient.findOne({ where: { phone, clinicId } })
     if (existing) {
