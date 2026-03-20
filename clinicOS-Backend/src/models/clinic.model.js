@@ -32,6 +32,13 @@ const Clinic = sequelize.define('Clinic', {
     type:      DataTypes.UUID,
     allowNull: true, // set after admin user is created
   },
+<<<<<<< HEAD
+  queuePaused: {
+    type:         DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+=======
+>>>>>>> 37997ae2e6c1a2e778c4d83b697699530c7bad82
 }, {
   tableName:  'clinics',
   timestamps: true,

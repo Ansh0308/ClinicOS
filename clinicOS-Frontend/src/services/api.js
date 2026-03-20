@@ -42,4 +42,24 @@ export const adminAPI = {
   getClinic:         ()          => api.get('/admin/clinic'),
   updateClinic:      (data)      => api.patch('/admin/clinic', data),
 }
+<<<<<<< HEAD
+
+export const patientAPI = {
+  lookup: (phone)  => api.post('/patients/lookup', { phone }),
+  create: (data)   => api.post('/patients', data),
+  get:    (id)     => api.get(`/patients/${id}`),
+}
+
+export const tokenAPI = {
+  getAll:     ()              => api.get('/tokens'),
+  create:     (data)          => api.post('/tokens', data),
+  emergency:  (data)          => api.post('/tokens/emergency', data),
+  updateStatus: (id, status)  => api.patch(`/tokens/${id}/status`, { status }),
+  cancel:     (id)            => api.delete(`/tokens/${id}`),
+  pause:      ()              => api.patch('/tokens/queue/pause'),
+  resume:     ()              => api.patch('/tokens/queue/resume'),
+}
+
+=======
+>>>>>>> 37997ae2e6c1a2e778c4d83b697699530c7bad82
 export default api

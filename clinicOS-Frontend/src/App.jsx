@@ -8,6 +8,10 @@ import AdminOverview    from './pages/admin/AdminOverview'
 import JoinRequests     from './pages/admin/JoinRequests'
 import TeamManagement   from './pages/admin/TeamManagement'
 import ClinicSettings   from './pages/admin/ClinicSettings'
+<<<<<<< HEAD
+import ReceptionDashboard from './pages/reception/ReceptionDashboard'
+=======
+>>>>>>> 37997ae2e6c1a2e778c4d83b697699530c7bad82
 
 // Pages
 import HomePage         from './pages/HomePage'
@@ -76,7 +80,11 @@ function AppContent() {
         {/* Protected dashboards */}
         <Route path="/reception" element={
           <ProtectedRoute allowedRoles={['staff', 'admin']}>
+<<<<<<< HEAD
+            <ReceptionDashboard />
+=======
             <ComingSoon name="Reception Dashboard" />
+>>>>>>> 37997ae2e6c1a2e778c4d83b697699530c7bad82
           </ProtectedRoute>
         } />
         <Route path="/doctor" element={
