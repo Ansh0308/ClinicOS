@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { patientAPI, tokenAPI, adminAPI } from '../../services/api'
+import { patientAPI, tokenAPI, adminAPI, clinicAPI } from '../../services/api'
 import ReceptionLayout from '../../layouts/ReceptionLayout'
 import {
   Search, Plus, Phone, UserPlus, ChevronRight,
@@ -100,8 +100,8 @@ export default function ReceptionDashboard() {
 
   const fetchDoctors = useCallback(async () => {
     try {
-      const res = await adminAPI.getTeam()
-      setDoctors(res.data.data.members.filter(m => m.role === 'doctor'))
+      const res = await clinicAPI.getDoctors()
+      setDoctors(res.data.data.doctors)
     } catch (err) {
       console.error(err)
     }

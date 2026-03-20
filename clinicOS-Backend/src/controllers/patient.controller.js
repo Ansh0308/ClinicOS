@@ -148,4 +148,6 @@ const getPatient = async (req, res) => {
   }
 }
 
-module.exports = { lookupPatient, createPatient, getPatient }
+const { getPatientProfile, getPatientVisits } = require('./visit.controller')
+
+module.exports = { lookupPatient, createPatient, getPatient, getPatientProfile, getPatientVisits }

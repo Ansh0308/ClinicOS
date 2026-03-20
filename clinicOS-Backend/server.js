@@ -31,6 +31,7 @@ app.use('/api/admin', require('./src/routes/clinic.routes'))
 // app.use('/api/admin',     require('./src/routes/clinic.routes'))
 app.use('/api/patients',  require('./src/routes/patient.routes'))
 app.use('/api/tokens',    require('./src/routes/token.routes'))
+app.use('/api/visits',    require('./src/routes/visit.routes'))
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {

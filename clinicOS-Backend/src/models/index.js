@@ -38,7 +38,9 @@ Patient.hasMany(Token,   { foreignKey: 'patientId', as: 'tokens' })
 Visit.belongsTo(Patient, { foreignKey: 'patientId', as: 'patient' })
 Visit.belongsTo(User,    { foreignKey: 'doctorId',  as: 'doctor' })
 Visit.belongsTo(Clinic,  { foreignKey: 'clinicId',  as: 'clinic' })
+Visit.belongsTo(Token,   { foreignKey: 'tokenId',   as: 'token' })
 Patient.hasMany(Visit,   { foreignKey: 'patientId', as: 'visits' })
+Token.hasOne(Visit,      { foreignKey: 'tokenId',   as: 'visit' })
 
 // Bill belongs to Patient and optionally a Visit
 Bill.belongsTo(Patient, { foreignKey: 'patientId', as: 'patient' })

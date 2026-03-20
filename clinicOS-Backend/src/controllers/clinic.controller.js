@@ -181,6 +181,25 @@ const updateClinicDetails = async (req, res) => {
   }
 }
 
+// ── GET /api/admin/doctors  (staff + admin accessible)
+const getDoctors = async (req, res) => {
+  try {
+    const doctors = await User.findAll({
+      where: {
+        clinicId: req.user.clinicId,
+        role:     'doctor',
+        status:   'approved',
+      },
+      attributes: ['id', 'name', 'email'],
+      order: [['name', 'ASC']],
+    })
+    return success(res, { doctors })
+  } catch (err) {
+    console.error('getDoctors error:', err.message)
+    return error(res, 'Failed to fetch doctors', 500)
+  }
+}
+
 module.exports = {
   getStats,
   getJoinRequests,
@@ -189,4 +208,5 @@ module.exports = {
   updateMember,
   getClinicDetails,
   updateClinicDetails,
+  getDoctors,
 }

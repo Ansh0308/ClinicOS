@@ -43,6 +43,10 @@ export const adminAPI = {
   updateClinic:      (data)      => api.patch('/admin/clinic', data),
 }
 
+export const clinicAPI = {
+  getDoctors: () => api.get('/admin/doctors'),
+}
+
 export const patientAPI = {
   lookup: (phone)  => api.post('/patients/lookup', { phone }),
   create: (data)   => api.post('/patients', data),
@@ -57,6 +61,14 @@ export const tokenAPI = {
   cancel:     (id)            => api.delete(`/tokens/${id}`),
   pause:      ()              => api.patch('/tokens/queue/pause'),
   resume:     ()              => api.patch('/tokens/queue/resume'),
+}
+
+export const visitAPI = {
+  create:   (data)       => api.post('/visits', data),
+  update:   (id, data)   => api.patch(`/visits/${id}`, data),
+  complete: (id)         => api.patch(`/visits/${id}/complete`),
+  getPatientVisits:  (patientId) => api.get(`/visits/patients/${patientId}/visits`),
+  getPatientProfile: (patientId) => api.get(`/visits/patients/${patientId}/profile`),
 }
 
 export default api

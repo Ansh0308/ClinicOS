@@ -29,6 +29,8 @@ clinicOS-Frontend/.env
 dist/
 dist-ssr/
 build/
+clinicOS-Frontend/dist/
+clinicOS-Frontend/build/
 
 # Local config
 *.local

@@ -9,6 +9,10 @@ import JoinRequests     from './pages/admin/JoinRequests'
 import TeamManagement   from './pages/admin/TeamManagement'
 import ClinicSettings   from './pages/admin/ClinicSettings'
 import ReceptionDashboard from './pages/reception/ReceptionDashboard'
+import DoctorLayout      from './layouts/DoctorLayout'
+import DoctorQueue       from './pages/doctor/DoctorQueue'
+import ConsultationForm  from './pages/doctor/ConsultationForm'
+import DoctorPatients    from './pages/doctor/DoctorPatients'
 
 // Pages
 import HomePage         from './pages/HomePage'
@@ -82,9 +86,13 @@ function AppContent() {
         } />
         <Route path="/doctor" element={
           <ProtectedRoute allowedRoles={['doctor']}>
-            <ComingSoon name="Doctor Dashboard" />
+            <DoctorLayout />
           </ProtectedRoute>
-        } />
+        }>
+          <Route index              element={<DoctorQueue />} />
+          <Route path="consult/:tokenId" element={<ConsultationForm />} />
+          <Route path="patients"    element={<DoctorPatients />} />
+        </Route>
         <Route path="/admin" element={
   <ProtectedRoute allowedRoles={['admin']}>
     <AdminLayout />

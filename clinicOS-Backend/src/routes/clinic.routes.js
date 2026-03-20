@@ -8,11 +8,16 @@ const {
   updateMember,
   getClinicDetails,
   updateClinicDetails,
+  getDoctors,
 } = require('../controllers/clinic.controller')
 const { protect }  = require('../middleware/auth.middleware')
 const { rbac }     = require('../middleware/rbac.middleware')
 
-// All routes require JWT + admin role
+// ── Staff + Admin accessible ──────────────────────────────────────
+// Doctors list — needed by reception to assign tokens
+router.get('/doctors', protect, rbac(['staff', 'admin', 'doctor']), getDoctors)
+
+// ── Admin only ────────────────────────────────────────────────────
 router.use(protect, rbac(['admin']))
 
 router.get('/stats',                getStats)
