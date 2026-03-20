@@ -9,7 +9,8 @@ import JoinRequests     from './pages/admin/JoinRequests'
 import TeamManagement   from './pages/admin/TeamManagement'
 import ClinicSettings   from './pages/admin/ClinicSettings'
 import ReceptionDashboard from './pages/reception/ReceptionDashboard'
-import DoctorLayout      from './layouts/DoctorLayout'
+import BillingScreen      from './pages/reception/BillingScreen'
+import DoctorLayout       from './layouts/DoctorLayout'
 import DoctorQueue       from './pages/doctor/DoctorQueue'
 import ConsultationForm  from './pages/doctor/ConsultationForm'
 import DoctorPatients    from './pages/doctor/DoctorPatients'
@@ -82,6 +83,11 @@ function AppContent() {
         <Route path="/reception" element={
           <ProtectedRoute allowedRoles={['staff', 'admin']}>
             <ReceptionDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/billing/:patientId" element={
+          <ProtectedRoute allowedRoles={['staff', 'admin']}>
+            <BillingScreen />
           </ProtectedRoute>
         } />
         <Route path="/doctor" element={

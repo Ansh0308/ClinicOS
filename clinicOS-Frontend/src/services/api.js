@@ -71,4 +71,11 @@ export const visitAPI = {
   getPatientProfile: (patientId) => api.get(`/visits/patients/${patientId}/profile`),
 }
 
+export const billAPI = {
+  create:     (data)          => api.post('/bills', data),
+  getAll:     (patientId)     => api.get('/bills', { params: { patientId } }),
+  get:        (id)            => api.get(`/bills/${id}`),
+  markPaid:   (id, method)    => api.patch(`/bills/${id}/payment`, { paymentMethod: method }),
+}
+
 export default api

@@ -47,6 +47,14 @@ const Bill = sequelize.define('Bill', {
     type:      DataTypes.DATE,
     allowNull: true,
   },
+  discountPercent: {
+    type:         DataTypes.DECIMAL(5, 2),
+    defaultValue: 0,
+  },
+  discountAmt: {
+    type:         DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
 }, {
   tableName:  'bills',
   timestamps: true,

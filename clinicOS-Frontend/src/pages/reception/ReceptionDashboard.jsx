@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { patientAPI, tokenAPI, adminAPI, clinicAPI } from '../../services/api'
 import ReceptionLayout from '../../layouts/ReceptionLayout'
 import {
   Search, Plus, Phone, UserPlus, ChevronRight,
   Activity, CheckCircle, Pause, X, Users,
-  Play, FlaskConical, AlertTriangle
+  Play, FlaskConical, AlertTriangle, IndianRupee
 } from 'lucide-react'
 
 const STATUS = {
@@ -56,6 +57,7 @@ function ToastContainer({ toasts }) {
 
 export default function ReceptionDashboard() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const { toasts, addToast } = useToast()
 
   // ── State ─────────────────────────────────────────────────────
@@ -257,6 +259,15 @@ export default function ReceptionDashboard() {
   const activeTokens = tokens.filter(t => ['waiting','now','paused','lab'].includes(t.status))
   const doneTokens   = tokens.filter(t => ['served','cancelled'].includes(t.status))
 
+  const handleCreateBill = (token) => {
+    navigate(`/billing/${token.patient?.id}`, {
+      state: {
+        patient: token.patient,
+        tokenId: token.id,
+      }
+    })
+  }
+
   return (
     <>
       <ReceptionLayout stats={stats}>
@@ -336,10 +347,18 @@ export default function ReceptionDashboard() {
                   </div>
 
                   {patient.hasActiveToken ? (
-                    <div className="bg-accent-yellow/10 border border-accent-yellow/30 rounded-xl p-3 text-center">
-                      <p className="font-body text-sm font-semibold text-amber-700">
-                        Already in queue — Token T-{patient.tokenNumber}
-                      </p>
+                    <div className="space-y-2">
+                      <div className="bg-accent-yellow/10 border border-accent-yellow/30 rounded-xl p-3 text-center">
+                        <p className="font-body text-sm font-semibold text-amber-700">
+                          Already in queue — Token T-{patient.tokenNumber}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/billing/${patient.id}`, { state: { patient } })}
+                        className="w-full py-2.5 rounded-xl border border-cream-300 bg-white text-text-body hover:bg-cream-100 font-body text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+                      >
+                        Create Bill <ChevronRight size={14} />
+                      </button>
                     </div>
                   ) : (
                     <>
@@ -529,7 +548,7 @@ export default function ReceptionDashboard() {
                   )}
 
                   {doneTokens.slice(0,5).map(token => (
-                    <TokenRow key={token.id} token={token} onStatusChange={handleStatusChange} onCancel={handleCancel} done />
+                    <TokenRow key={token.id} token={token} onStatusChange={handleStatusChange} onCancel={handleCancel} done onCreateBill={token.status === 'served' ? handleCreateBill : null} />
                   ))}
                 </div>
               )}
@@ -600,7 +619,7 @@ export default function ReceptionDashboard() {
 }
 
 // ── Token Row ─────────────────────────────────────────────────────────────────
-function TokenRow({ token, onStatusChange, onCancel, done = false }) {
+function TokenRow({ token, onStatusChange, onCancel, done = false, onCreateBill }) {
   const config = STATUS[token.status] || STATUS.waiting
 
   return (
@@ -648,6 +667,17 @@ function TokenRow({ token, onStatusChange, onCancel, done = false }) {
           )}
           <Btn icon={X}              onClick={() => onCancel(token.id)}                  title="Cancel"        cls="text-accent-coral hover:bg-accent-coral/10" />
         </div>
+      )}
+
+      {/* ── Served token: show Create Bill button ─────────────── */}
+      {token.status === 'served' && onCreateBill && (
+        <button
+          onClick={() => onCreateBill(token)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent-teal text-white font-body text-xs font-bold hover:brightness-105 transition-all flex-shrink-0"
+        >
+          <IndianRupee size={12} />
+          Bill
+        </button>
       )}
     </div>
   )
