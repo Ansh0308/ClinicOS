@@ -29,8 +29,13 @@ app.use('/api/admin', require('./src/routes/clinic.routes'))
 // ── Routes (add each as you build them) ───────────────────────────────────────
 // app.use('/api/auth',      require('./src/routes/auth.routes'))
 // app.use('/api/admin',     require('./src/routes/clinic.routes'))
+<<<<<<< HEAD
 app.use('/api/patients',  require('./src/routes/patient.routes'))
 app.use('/api/tokens',    require('./src/routes/token.routes'))
+=======
+// app.use('/api/patients',  require('./src/routes/patient.routes'))
+// app.use('/api/tokens',    require('./src/routes/token.routes'))
+>>>>>>> 37997ae2e6c1a2e778c4d83b697699530c7bad82
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {
