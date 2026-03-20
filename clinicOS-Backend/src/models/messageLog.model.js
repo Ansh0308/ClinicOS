@@ -27,6 +27,10 @@ const MessageLog = sequelize.define('MessageLog', {
     type:         DataTypes.ENUM('sent', 'failed', 'delivered'),
     defaultValue: 'sent',
   },
+  errorMessage: {
+    type:      DataTypes.TEXT,
+    allowNull: true,
+  },
   sentAt: {
     type:         DataTypes.DATE,
     defaultValue: DataTypes.NOW,

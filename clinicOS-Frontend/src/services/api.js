@@ -47,10 +47,16 @@ export const clinicAPI = {
   getDoctors: () => api.get('/admin/doctors'),
 }
 
+export const messageAPI = {
+  getLogs:  (params) => api.get('/messages',       { params }),
+  getStats: ()       => api.get('/messages/stats'),
+}
+
 export const patientAPI = {
-  lookup: (phone)  => api.post('/patients/lookup', { phone }),
-  create: (data)   => api.post('/patients', data),
-  get:    (id)     => api.get(`/patients/${id}`),
+  lookup:       (phone)         => api.post('/patients/lookup', { phone }),
+  create:       (data)          => api.post('/patients', data),
+  get:          (id)            => api.get(`/patients/${id}`),
+  updateOptIn:  (id, optInMsg)  => api.patch(`/patients/${id}/opt-in`, { optInMsg }),
 }
 
 export const tokenAPI = {

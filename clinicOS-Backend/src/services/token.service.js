@@ -1,5 +1,6 @@
 const { Token, Patient } = require('../models')
 const { Op } = require('sequelize')
+const { sendMessage } = require('./message.service')
 
 // Get next token number for today (resets daily per clinic)
 const getNextTokenNumber = async (clinicId) => {
@@ -66,12 +67,37 @@ const recalculatePositions = async (clinicId) => {
       status:    'waiting',
       createdAt: { [Op.gte]: today },
     },
+    include: [{ association: 'patient', attributes: ['id', 'name'] }],
     order: [['createdAt', 'ASC']],
   })
 
   // Update positions sequentially
   for (let i = 0; i < waitingTokens.length; i++) {
     await waitingTokens[i].update({ queuePosition: i + 1 })
+  }
+
+  // Check for position 2 tokens and trigger reminder
+  for (const t of waitingTokens) {
+    if (t.queuePosition === 2) {
+      try {
+        const clinic = await require('../models').Clinic.findByPk(t.clinicId, {
+          attributes: ['name'],
+        })
+        sendMessage({
+          patientId:    t.patientId,
+          clinicId:     t.clinicId,
+          templateName: 'two_before_you',
+          variables: {
+            patient_name: t.patient?.name || 'Patient',
+            token_number: t.tokenNumber,
+            clinic_name:  clinic?.name || 'the clinic',
+          },
+          channels: ['email'],
+        })
+      } catch (err) {
+        console.error('Two before you trigger failed:', err.message)
+      }
+    }
   }
 }
 

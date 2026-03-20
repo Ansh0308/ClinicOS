@@ -3,13 +3,14 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import {
   Stethoscope, LayoutDashboard, Users, UserCheck,
-  Settings, LogOut, Menu, X, Copy, Check
+  Settings, LogOut, Menu, X, Copy, Check, MessageSquare
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { to: '/admin',          label: 'Overview',       icon: LayoutDashboard, end: true },
   { to: '/admin/requests', label: 'Join Requests',  icon: UserCheck },
   { to: '/admin/team',     label: 'Team',           icon: Users },
+  { to: '/admin/messages', label: 'Messages',       icon: MessageSquare },
   { to: '/admin/settings', label: 'Settings',       icon: Settings },
 ]
 

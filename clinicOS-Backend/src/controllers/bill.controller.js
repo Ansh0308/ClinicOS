@@ -1,6 +1,7 @@
 const { success, error } = require('../utils/apiResponse')
 const { Bill, Patient, Visit, Clinic } = require('../models')
 const { Op } = require('sequelize')
+const { sendMessage } = require('../services/message.service')
 
 // ── POST /api/bills ───────────────────────────────────────────────
 const createBill = async (req, res) => {
@@ -69,6 +70,27 @@ const markPaid = async (req, res) => {
       paymentMethod,
       paidAt:        new Date(),
     })
+
+    // ── Trigger bill_receipt message ──────────────────────────────────
+    try {
+      const clinic = await Clinic.findByPk(clinicId, { attributes: ['name'] })
+
+      sendMessage({
+        patientId: bill.patientId,
+        clinicId,
+        templateName: 'bill_receipt',
+        variables: {
+          patient_name:   bill.patient?.name || 'Patient',
+          amount:         Number(bill.total).toLocaleString('en-IN', { minimumFractionDigits: 2 }),
+          payment_method: req.body.paymentMethod?.toUpperCase(),
+          payment_date:   new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
+          clinic_name:    clinic?.name || 'the clinic',
+        },
+        channels: ['email'],
+      })
+    } catch (err) {
+      console.error('Bill receipt message trigger failed:', err.message)
+    }
 
     return success(res, { bill, message: 'Payment recorded' })
   } catch (err) {

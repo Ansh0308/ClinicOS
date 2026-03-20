@@ -6,6 +6,7 @@ const {
   calculateETA,
   recalculatePositions,
 } = require('../services/token.service')
+const { sendMessage } = require('../services/message.service')
 
 // GET /api/tokens
 const getTokens = async (req, res) => {
@@ -98,6 +99,32 @@ const createToken = async (req, res) => {
       ],
     })
 
+    // ── Trigger token_issued message ─────────────────────────────────
+    try {
+      const clinic = await require('../models').Clinic.findByPk(clinicId, {
+        attributes: ['name'],
+      })
+
+      // Fire and forget — don't await so API responds fast
+      sendMessage({
+        patientId,
+        clinicId,
+        templateName: 'token_issued',
+        variables: {
+          patient_name:    full.patient?.name || 'Patient',
+          token_number:    tokenNumber,
+          clinic_name:     clinic?.name || 'the clinic',
+          queue_position:  waitingCount + 1,
+          estimated_wait:  estimatedWait,
+        },
+        channels: ['email'],
+        // Add 'whatsapp' here when WhatsApp API is configured
+      })
+    } catch (err) {
+      // Never let messaging failure break the token creation response
+      console.error('Token message trigger failed:', err.message)
+    }
+
     return success(res, { token: full }, 201)
   } catch (err) {
     console.error('createToken error:', err.message)
@@ -133,6 +160,28 @@ const updateTokenStatus = async (req, res) => {
 
     // Recalculate positions after any change
     await recalculatePositions(clinicId)
+
+    // ── Trigger your_turn message when called ────────────────────────
+    if (status === 'now') {
+      try {
+        const clinic = await require('../models').Clinic.findByPk(clinicId, {
+          attributes: ['name'],
+        })
+        sendMessage({
+          patientId: token.patientId,
+          clinicId,
+          templateName: 'your_turn',
+          variables: {
+            patient_name: token.patient?.name || 'Patient',
+            token_number: token.tokenNumber,
+            clinic_name:  clinic?.name || 'the clinic',
+          },
+          channels: ['email'],
+        })
+      } catch (err) {
+        console.error('Your turn message trigger failed:', err.message)
+      }
+    }
 
     return success(res, { message: 'Token status updated', token })
   } catch (err) {

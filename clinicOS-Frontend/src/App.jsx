@@ -8,6 +8,7 @@ import AdminOverview    from './pages/admin/AdminOverview'
 import JoinRequests     from './pages/admin/JoinRequests'
 import TeamManagement   from './pages/admin/TeamManagement'
 import ClinicSettings   from './pages/admin/ClinicSettings'
+import MessageLogs      from './pages/admin/MessageLogs'
 import ReceptionDashboard from './pages/reception/ReceptionDashboard'
 import BillingScreen      from './pages/reception/BillingScreen'
 import DoctorLayout       from './layouts/DoctorLayout'
@@ -107,6 +108,7 @@ function AppContent() {
   <Route index          element={<AdminOverview />} />
   <Route path="requests" element={<JoinRequests />} />
   <Route path="team"     element={<TeamManagement />} />
+  <Route path="messages" element={<MessageLogs />} />
   <Route path="settings" element={<ClinicSettings />} />
 </Route>
         <Route path="/patient/*" element={

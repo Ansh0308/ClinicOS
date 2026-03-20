@@ -150,4 +150,24 @@ const getPatient = async (req, res) => {
 
 const { getPatientProfile, getPatientVisits } = require('./visit.controller')
 
-module.exports = { lookupPatient, createPatient, getPatient, getPatientProfile, getPatientVisits }
+// PATCH /api/patients/:id/opt-in
+const updateOptIn = async (req, res) => {
+  const { optInMsg } = req.body
+
+  try {
+    const patient = await Patient.findOne({
+      where: { id: req.params.id, clinicId: req.user.clinicId },
+    })
+
+    if (!patient) return error(res, 'Patient not found', 404)
+
+    await patient.update({ optInMsg: !!optInMsg })
+
+    return success(res, { message: `Messaging ${optInMsg ? 'enabled' : 'disabled'} for patient` })
+  } catch (err) {
+    console.error('updateOptIn error:', err.message)
+    return error(res, 'Failed to update opt-in', 500)
+  }
+}
+
+module.exports = { lookupPatient, createPatient, getPatient, getPatientProfile, getPatientVisits, updateOptIn }
