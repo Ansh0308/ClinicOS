@@ -5,6 +5,7 @@ import Footer from './components/layout/Footer'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import AdminLayout      from './components/layout/AdminLayout'
 import AdminOverview    from './pages/admin/AdminOverview'
+import Analytics        from './pages/admin/Analytics'
 import JoinRequests     from './pages/admin/JoinRequests'
 import TeamManagement   from './pages/admin/TeamManagement'
 import ClinicSettings   from './pages/admin/ClinicSettings'
@@ -114,6 +115,7 @@ function AppContent() {
   </ProtectedRoute>
 }>
   <Route index          element={<AdminOverview />} />
+  <Route path="analytics" element={<Analytics />} />
   <Route path="requests" element={<JoinRequests />} />
   <Route path="team"     element={<TeamManagement />} />
   <Route path="messages" element={<MessageLogs />} />

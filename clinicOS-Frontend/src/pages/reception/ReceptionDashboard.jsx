@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { patientAPI, tokenAPI, adminAPI, clinicAPI } from '../../services/api'
+import { patientAPI, tokenAPI, clinicAPI, analyticsAPI } from '../../services/api'
 import ReceptionLayout from '../../layouts/ReceptionLayout'
 import {
   Phone, UserPlus, Search, Users, Activity, Clock, X, ChevronDown,
@@ -72,6 +72,7 @@ export default function ReceptionDashboard() {
 
   const [tokens, setTokens]                 = useState([])
   const [stats, setStats]                   = useState({ inQueue: 0, servedToday: 0 })
+  const [analyticsSummary, setAnalyticsSummary] = useState(null)
   const [loadingTokens, setLoadingTokens]   = useState(true)
   const [issuingToken, setIssuingToken]     = useState(false)
 
@@ -113,12 +114,25 @@ export default function ReceptionDashboard() {
     }
   }, [])
 
+  const fetchAnalyticsSummary = useCallback(async () => {
+    try {
+      const res = await analyticsAPI.getOverview({ range: 'today' })
+      setAnalyticsSummary(res.data.data.kpis)
+    } catch (err) {
+      console.error('Reception analytics fetch error:', err)
+    }
+  }, [])
+
   useEffect(() => {
     fetchTokens()
     fetchDoctors()
-    const interval = setInterval(fetchTokens, 15000)
+    fetchAnalyticsSummary()
+    const interval = setInterval(() => {
+      fetchTokens()
+      fetchAnalyticsSummary()
+    }, 15000)
     return () => clearInterval(interval)
-  }, [fetchTokens, fetchDoctors])
+  }, [fetchTokens, fetchDoctors, fetchAnalyticsSummary])
 
   // ── Patient search ────────────────────────────────────────────
   const handleSearch = async () => {
@@ -308,6 +322,35 @@ export default function ReceptionDashboard() {
             >
               Resume
             </button>
+          </div>
+        )}
+
+        {analyticsSummary && (
+          <div className="grid gap-3 mb-4 max-w-7xl mx-auto md:grid-cols-3">
+            <ReceptionSummaryCard
+              label="Patients Today"
+              value={analyticsSummary.patientsToday || 0}
+              note={`${analyticsSummary.totalTokens || 0} tokens issued`}
+              tone="crimson"
+            />
+            <ReceptionSummaryCard
+              label="Average Wait"
+              value={`${analyticsSummary.avgWaitMins || 0}m`}
+              note="Measured from issue to call"
+              tone="sky"
+            />
+            <ReceptionSummaryCard
+              label="Queue Health"
+              value={(analyticsSummary.queueHealth || 'green').toUpperCase()}
+              note={
+                analyticsSummary.queueHealth === 'red'
+                  ? 'Action needed'
+                  : analyticsSummary.queueHealth === 'amber'
+                    ? 'Watch queue'
+                    : 'Running smoothly'
+              }
+              tone={analyticsSummary.queueHealth || 'green'}
+            />
           </div>
         )}
 
@@ -797,5 +840,23 @@ function Btn({ icon: Icon, onClick, title, cls }) {
       className={`w-7 h-7 rounded-xl flex items-center justify-center transition-colors ${cls}`}>
       <Icon size={13} />
     </button>
+  )
+}
+
+function ReceptionSummaryCard({ label, value, note, tone }) {
+  const styles = {
+    crimson: 'bg-crimson-50 border-crimson-200 text-crimson-700',
+    sky: 'bg-accent-sky/10 border-accent-sky/20 text-accent-sky',
+    green: 'bg-accent-teal/10 border-accent-teal/20 text-accent-teal',
+    amber: 'bg-accent-yellow/10 border-accent-yellow/30 text-amber-700',
+    red: 'bg-accent-coral/10 border-accent-coral/20 text-accent-coral',
+  }
+
+  return (
+    <div className={`rounded-3xl border px-5 py-4 ${styles[tone] || styles.green}`}>
+      <p className="font-body text-xs font-bold uppercase tracking-wider text-text-muted">{label}</p>
+      <p className="mt-1 font-display text-3xl font-bold">{value}</p>
+      <p className="mt-1 font-body text-xs text-text-muted">{note}</p>
+    </div>
   )
 }

@@ -32,6 +32,7 @@ app.use('/api/tokens',    require('./src/routes/token.routes'))
 app.use('/api/visits',    require('./src/routes/visit.routes'))
 app.use('/api/bills',     require('./src/routes/bill.routes'))
 app.use('/api/messages',  require('./src/routes/message.routes'))
+app.use('/api/analytics', require('./src/routes/analytics.routes'))
 
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {

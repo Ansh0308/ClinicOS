@@ -3,32 +3,20 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import {
   Stethoscope, LayoutDashboard, Users, UserCheck,
-  Settings, LogOut, Menu, X, Copy, Check, MessageSquare
+  Settings, LogOut, Menu, Copy, Check, MessageSquare, BarChart2
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { to: '/admin',          label: 'Overview',       icon: LayoutDashboard, end: true },
+  { to: '/admin/analytics',label: 'Analytics',      icon: BarChart2 },
   { to: '/admin/requests', label: 'Join Requests',  icon: UserCheck },
   { to: '/admin/team',     label: 'Team',           icon: Users },
   { to: '/admin/messages', label: 'Messages',       icon: MessageSquare },
   { to: '/admin/settings', label: 'Settings',       icon: Settings },
 ]
 
-export default function AdminLayout() {
-  const { user, logout }          = useAuth()
-  const navigate                  = useNavigate()
-  const [sidebarOpen, setSidebar] = useState(false)
-  const [copied, setCopied]       = useState(false)
-
-  const handleLogout = () => { logout(); navigate('/') }
-
-  const copyCode = () => {
-    navigator.clipboard.writeText(user?.clinicCode || '')
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const SidebarContent = () => (
+function SidebarContent({ user, copied, copyCode, handleLogout, closeSidebar }) {
+  return (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="px-6 py-5 border-b border-cream-200">
@@ -59,12 +47,12 @@ export default function AdminLayout() {
 
       {/* Nav links */}
       <nav className="flex-1 px-4 py-4 space-y-1">
-        {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+        {NAV_ITEMS.map(({ to, label, icon: NavIcon, end }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
-            onClick={() => setSidebar(false)}
+            onClick={closeSidebar}
             className={({ isActive }) => `
               flex items-center gap-3 px-4 py-2.5 rounded-2xl font-body text-sm font-medium transition-all
               ${isActive
@@ -73,7 +61,7 @@ export default function AdminLayout() {
               }
             `}
           >
-            <Icon size={18} />
+            <NavIcon size={18} />
             {label}
           </NavLink>
         ))}
@@ -102,13 +90,34 @@ export default function AdminLayout() {
       </div>
     </div>
   )
+}
+
+export default function AdminLayout() {
+  const { user, logout }          = useAuth()
+  const navigate                  = useNavigate()
+  const [sidebarOpen, setSidebar] = useState(false)
+  const [copied, setCopied]       = useState(false)
+
+  const handleLogout = () => { logout(); navigate('/') }
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(user?.clinicCode || '')
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   return (
     <div className="min-h-screen bg-cream-50 flex">
 
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-cream-200 fixed h-full z-30">
-        <SidebarContent />
+        <SidebarContent
+          user={user}
+          copied={copied}
+          copyCode={copyCode}
+          handleLogout={handleLogout}
+          closeSidebar={() => setSidebar(false)}
+        />
       </aside>
 
       {/* Mobile sidebar overlay */}
@@ -116,7 +125,13 @@ export default function AdminLayout() {
         <div className="md:hidden fixed inset-0 z-40 flex">
           <div className="fixed inset-0 bg-black/30" onClick={() => setSidebar(false)} />
           <aside className="relative w-72 bg-white h-full z-50 flex flex-col">
-            <SidebarContent />
+            <SidebarContent
+              user={user}
+              copied={copied}
+              copyCode={copyCode}
+              handleLogout={handleLogout}
+              closeSidebar={() => setSidebar(false)}
+            />
           </aside>
         </div>
       )}

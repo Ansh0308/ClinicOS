@@ -47,6 +47,14 @@ export const clinicAPI = {
   getDoctors: () => api.get('/admin/doctors'),
 }
 
+export const analyticsAPI = {
+  getOverview:   (params) => api.get('/analytics/overview', { params }),
+  getRevenue:    (params) => api.get('/analytics/revenue', { params }),
+  getQueue:      (params) => api.get('/analytics/queue', { params }),
+  getComplaints: (params) => api.get('/analytics/complaints', { params }),
+  getDoctors:    (params) => api.get('/analytics/doctors', { params }),
+}
+
 export const messageAPI = {
   getLogs:  (params) => api.get('/messages',       { params }),
   getStats: ()       => api.get('/messages/stats'),
