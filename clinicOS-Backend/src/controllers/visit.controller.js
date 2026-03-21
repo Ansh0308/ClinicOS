@@ -90,6 +90,16 @@ const completeVisit = async (req, res) => {
       )
     }
 
+    const { writeAudit } = require('../utils/audit')
+    writeAudit({
+      userId:   req.user.id,
+      clinicId: visit.clinicId,
+      action:   'VISIT_COMPLETED',
+      entity:   'Visit',
+      entityId: visit.id,
+      meta:     { patientId: visit.patientId },
+    })
+
     return success(res, { message: 'Visit completed' })
   } catch (err) {
     console.error('completeVisit error:', err.message)

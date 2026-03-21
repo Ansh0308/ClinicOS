@@ -20,6 +20,14 @@ const buildPatientResponse = async (patient, clinicId) => {
     where: { patientId: patient.id }
   })
 
+  const unpaidBills = await require('../models').Bill.findAll({
+    where: { patientId: patient.id, clinicId, status: { [Op.notIn]: ['paid', 'cancelled'] } },
+    attributes: ['total', 'paidAmount'],
+  })
+  const outstandingBalance = unpaidBills.reduce(
+    (sum, b) => sum + Number(b.total) - Number(b.paidAmount || 0), 0
+  )
+
   return {
     id:          patient.id,
     name:        patient.name,
@@ -27,6 +35,7 @@ const buildPatientResponse = async (patient, clinicId) => {
     dob:         patient.dob,
     gender:      patient.gender,
     visitCount,
+    outstandingBalance,
     hasActiveToken: !!activeToken,
     activeTokenId:  activeToken?.id || null,
     tokenNumber:    activeToken?.tokenNumber || null,
@@ -83,7 +92,7 @@ const lookupPatient = async (req, res) => {
 // POST /api/patients
 const createPatient = async (req, res) => {
   try {
-    let { phone, name, dob, gender, optInMsg } = req.body
+    let { phone, name, dob, gender, optInMsg, email } = req.body
     const clinicId = req.user.clinicId
 
     if (!phone) return error(res, 'Phone number is required', 400)
@@ -105,23 +114,30 @@ const createPatient = async (req, res) => {
       if (activeToken) {
         return error(res, 'Patient already has active token', 409)
       }
-      // Patient exists but no active token — return them instead of erroring
+      // Patient exists but no active token — return them
       return success(res, {
         patient: { ...existing.toJSON(), visitCount: 0, hasActiveToken: false }
       }, 200)
     }
 
-    // Also check if they pre-registered via homepage (users table)
-    // and create a linked record
-    const userRecord = await User.findOne({ where: { phone, role: 'patient' } })
+    // Try to find a linked user account by phone or email
+    let userId = null
+    const userByPhone = await User.findOne({ where: { phone, role: 'patient' } })
+    if (userByPhone) {
+      userId = userByPhone.id
+    } else if (email) {
+      const userByEmail = await User.findOne({ where: { email, role: 'patient' } })
+      if (userByEmail) userId = userByEmail.id
+    }
 
     const patient = await Patient.create({
       clinicId,
-      userId:   userRecord?.id  || null,
+      userId:   userId || null,
       phone,
-      name:     name            || userRecord?.name || null,
-      dob:      dob             || null,
-      gender:   gender          || null,
+      email:    email  || null,
+      name:     name   || (userId ? (userByPhone || await User.findByPk(userId))?.name : null) || null,
+      dob:      dob    || null,
+      gender:   gender || null,
       optInMsg: optInMsg !== false,
     })
 

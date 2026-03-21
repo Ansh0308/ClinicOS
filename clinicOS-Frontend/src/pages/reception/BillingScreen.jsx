@@ -97,6 +97,7 @@ export default function BillingScreen() {
       const res = await billAPI.create({
         patientId: patient.id,
         visitId:   location.state?.visitId || null,
+        tokenId:   location.state?.tokenId || null,
         items:     validItems,
         discountPercent: discount,
       })

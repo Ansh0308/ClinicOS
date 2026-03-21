@@ -91,6 +91,22 @@ Appointment details: {appointment_time}
 
 Please carry this message when you visit.`,
   },
+
+  queue_paused: {
+    subject: 'Queue update at {clinic_name}',
+    body: `Hi {patient_name}, the queue at {clinic_name} has been temporarily paused.
+
+Your token *T-{token_number}* (position #{queue_position}) has been held.
+We will resume shortly and notify you.`,
+  },
+
+  queue_resumed: {
+    subject: 'Queue resumed at {clinic_name}',
+    body: `Hi {patient_name}, the queue at {clinic_name} has resumed!
+
+Your updated estimated wait: ~{estimated_wait} minutes.
+Token: *T-{token_number}* · Position: #{queue_position}`,
+  },
 }
 
 // Replace all {variable} placeholders with actual values

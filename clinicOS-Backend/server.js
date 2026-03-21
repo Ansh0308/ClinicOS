@@ -50,12 +50,18 @@ const start = async () => {
     await sequelize.authenticate()
     console.log('✅ MySQL connected')
 
-    // sync({ alter: true }) updates existing tables to match your models
-    await sequelize.sync({ alter: true })
+    // sync with alter:{ drop:false } — adds new columns/tables but never
+    // drops or re-creates existing indexes, preventing the MySQL 64-keys limit
+    await sequelize.sync({ alter: { drop: false } })
     console.log('✅ All tables synced')
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`)
+    })
+    
+    server.on('error', (err) => {
+      console.error('❌ Server listen error:', err.message)
+      process.exit(1)
     })
   } catch (err) {
     console.error('❌ Failed to start server:', err.message)

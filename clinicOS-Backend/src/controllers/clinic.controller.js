@@ -88,6 +88,16 @@ const reviewRequest = async (req, res) => {
       )
     }
 
+    const { writeAudit } = require('../utils/audit')
+    await writeAudit({
+      userId:   req.user.id,
+      clinicId: req.user.clinicId,
+      action:   `JOIN_REQUEST_${action.toUpperCase()}D`,
+      entity:   'JoinRequest',
+      entityId: request.id,
+      meta:     { targetUserId: request.userId, action },
+    })
+
     return success(res, { message: `Request ${action}d successfully` })
   } catch (err) {
     console.error('reviewRequest error:', err.message)

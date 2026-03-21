@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   Stethoscope, Home, Activity,
-  FileText, Receipt, LogOut
+  FileText, Receipt, LogOut, User, Bell
 } from 'lucide-react'
 
 const NAV = [
@@ -10,6 +10,7 @@ const NAV = [
   { to: '/patient/queue',   label: 'Queue',   icon: Activity },
   { to: '/patient/history', label: 'History', icon: FileText },
   { to: '/patient/bills',   label: 'Bills',   icon: Receipt },
+  { to: '/patient/profile', label: 'Profile', icon: User },
 ]
 
 export default function PatientLayout() {
@@ -30,6 +31,15 @@ export default function PatientLayout() {
           <span className="font-display font-bold text-white text-lg">ClinicOS</span>
         </div>
         <div className="flex items-center gap-2">
+          <NavLink
+            to="/patient/notifications"
+            className={({ isActive }) =>
+              `w-8 h-8 rounded-xl flex items-center justify-center transition-all
+              ${isActive ? 'bg-white/30' : 'bg-white/10 hover:bg-white/20'}`
+            }
+          >
+            <Bell size={15} className="text-white" />
+          </NavLink>
           <span className="font-body text-sm text-white/80">{user?.name?.split(' ')[0]}</span>
           <button
             onClick={handleLogout}
@@ -45,7 +55,7 @@ export default function PatientLayout() {
         <Outlet />
       </main>
 
-      {/* Bottom nav bar — mobile style */}
+      {/* Bottom nav — mobile style */}
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white border-t border-cream-200 flex z-30">
         {NAV.map(({ to, label, icon: Icon, end }) => (
           <NavLink

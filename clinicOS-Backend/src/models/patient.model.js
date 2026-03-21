@@ -9,7 +9,7 @@ const Patient = sequelize.define('Patient', {
   },
   userId: {
     type:      DataTypes.UUID,
-    allowNull: true, // null for walk-in patients who aren't registered users
+    allowNull: true, // null for walk-in patients who haven't signed up yet
   },
   clinicId: {
     type:      DataTypes.UUID,
@@ -18,6 +18,10 @@ const Patient = sequelize.define('Patient', {
   phone: {
     type:      DataTypes.STRING(15),
     allowNull: false,
+  },
+  email: {
+    type:      DataTypes.STRING(200),
+    allowNull: true,
   },
   name: {
     type:      DataTypes.STRING(200),
@@ -41,7 +45,7 @@ const Patient = sequelize.define('Patient', {
   indexes: [
     {
       unique: true,
-      fields: ['phone', 'clinicId'], // same phone can exist in different clinics
+      fields: ['phone', 'clinicId'],
     },
   ],
 })

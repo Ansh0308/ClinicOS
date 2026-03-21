@@ -34,6 +34,8 @@ import PatientDashboard from './pages/patient/PatientDashboard'
 import QueueTracker     from './pages/patient/QueueTracker'
 import VisitHistory     from './pages/patient/VisitHistory'
 import BillHistory      from './pages/patient/BillHistory'
+import PatientProfile   from './pages/patient/PatientProfile'
+import NotificationLog  from './pages/patient/NotificationLog'
 
 // Routes where public Navbar/Footer should be hidden
 const HIDE_NAV_ROUTES = [
@@ -122,10 +124,12 @@ function AppContent() {
             <PatientLayout />
           </ProtectedRoute>
         }>
-          <Route index           element={<PatientDashboard />} />
-          <Route path="queue"    element={<QueueTracker />} />
-          <Route path="history"  element={<VisitHistory />} />
-          <Route path="bills"    element={<BillHistory />} />
+          <Route index              element={<PatientDashboard />} />
+          <Route path="queue"       element={<QueueTracker />} />
+          <Route path="history"     element={<VisitHistory />} />
+          <Route path="bills"       element={<BillHistory />} />
+          <Route path="profile"     element={<PatientProfile />} />
+          <Route path="notifications" element={<NotificationLog />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

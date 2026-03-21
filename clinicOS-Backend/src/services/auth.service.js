@@ -27,17 +27,24 @@ const registerUser = async ({ name, email, password, phone, role, clinicData, cl
     emailVerified: true, // OTP was already verified before calling register
   })
 
-  // ── Link to existing walk-in patient record if phone matches ─────
-  if (role === 'patient' && phone) {
-    const existingPatient = await Patient.findOne({
-      where: { phone, userId: null }
-    })
-    if (existingPatient) {
-      // Link existing walk-in record to this new user account
-      await existingPatient.update({ userId: user.id })
+  // ── Link to existing walk-in patient record(s) if phone or email matches ──
+  if (role === 'patient') {
+    // Link ALL unlinked patient records for this phone (multi-clinic support)
+    if (phone) {
+      const byPhone = await Patient.findAll({ where: { phone, userId: null } })
+      for (const p of byPhone) {
+        await p.update({ userId: user.id })
+        console.log(`✅ Auto-linked patient ${p.id} to user ${user.id} via phone`)
+      }
     }
-    // Note: if no patient record exists yet, it gets created when
-    // staff registers them at reception — the userId link happens then
+    // Also link by email (for staff-registered patients where phone may differ)
+    if (email) {
+      const byEmail = await Patient.findAll({ where: { email, userId: null } })
+      for (const p of byEmail) {
+        await p.update({ userId: user.id })
+        console.log(`✅ Auto-linked patient ${p.id} to user ${user.id} via email`)
+      }
+    }
   }
 
   let clinicId   = null

@@ -60,10 +60,17 @@ export const patientAPI = {
 }
 
 export const patientPortalAPI = {
-  getDashboard:   () => api.get('/patient/dashboard'),
-  getActiveToken: () => api.get('/patient/token'),
-  getVisits:      () => api.get('/patient/visits'),
-  getBills:       () => api.get('/patient/bills'),
+  getDashboard:        () => api.get('/patient/dashboard'),
+  getActiveToken:      () => api.get('/patient/token'),
+  getVisits:           () => api.get('/patient/visits'),
+  getBills:            () => api.get('/patient/bills'),
+  getProfile:          () => api.get('/patient/profile'),
+  updateProfile:       (data) => api.patch('/patient/profile', data),
+  leaveQueue:          () => api.post('/patient/leave-queue'),
+  payBill:             (id, method) => api.post(`/patient/bills/${id}/pay`, { paymentMethod: method }),
+  createRazorpayOrder: (id) => api.post(`/patient/bills/${id}/razorpay-order`),
+  verifyPayment:       (id, data) => api.post(`/patient/bills/${id}/razorpay-verify`, data),
+  getNotifications:    () => api.get('/patient/notifications'),
 }
 
 export const tokenAPI = {
@@ -85,10 +92,12 @@ export const visitAPI = {
 }
 
 export const billAPI = {
-  create:     (data)          => api.post('/bills', data),
-  getAll:     (patientId)     => api.get('/bills', { params: { patientId } }),
-  get:        (id)            => api.get(`/bills/${id}`),
-  markPaid:   (id, method)    => api.patch(`/bills/${id}/payment`, { paymentMethod: method }),
+  create:              (data)      => api.post('/bills', data),
+  getAll:              (patientId) => api.get('/bills', { params: { patientId } }),
+  get:                 (id)        => api.get(`/bills/${id}`),
+  markPaid:            (id, method)=> api.patch(`/bills/${id}/payment`, { paymentMethod: method }),
+  createRazorpayOrder: (id)        => api.post(`/bills/${id}/razorpay-order`),
+  verifyPayment:       (id, data)  => api.post(`/bills/${id}/razorpay-verify`, data),
 }
 
 export default api

@@ -21,6 +21,8 @@
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.20.0",
     "nodemailer": "^8.0.3",
+    "pdfkit": "^0.18.0",
+    "razorpay": "^2.9.6",
     "sequelize": "^6.37.8"
   },
   "devDependencies": {

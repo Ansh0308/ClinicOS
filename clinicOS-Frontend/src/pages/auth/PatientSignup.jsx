@@ -127,6 +127,9 @@ export default function PatientSignup() {
             <Field label="Mobile Number" error={errors.phone?.message}>
               <input {...register('phone')} type="tel" placeholder="9876543210" className={inputCls(errors.phone)} />
             </Field>
+            <p className="font-body text-xs text-text-muted -mt-2 px-1">
+              💡 Use the same number you gave at the clinic — this links your account to your visit records
+            </p>
             <Field label="Password" error={errors.password?.message}>
               <div className="relative">
                 <input {...register('password')} type={showPass ? 'text' : 'password'} placeholder="Min 8 characters" className={inputCls(errors.password) + ' pr-10'} />

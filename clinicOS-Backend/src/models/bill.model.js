@@ -11,6 +11,10 @@ const Bill = sequelize.define('Bill', {
     type:      DataTypes.UUID,
     allowNull: true,
   },
+  tokenId: {
+    type:      DataTypes.UUID,
+    allowNull: true,
+  },
   patientId: {
     type:      DataTypes.UUID,
     allowNull: false,
@@ -20,7 +24,7 @@ const Bill = sequelize.define('Bill', {
     allowNull: false,
   },
   items: {
-    type:         DataTypes.JSON, // [{ name, quantity, unitPrice, lineTotal }]
+    type:         DataTypes.JSON,
     defaultValue: [],
   },
   subtotal: {
@@ -35,12 +39,16 @@ const Bill = sequelize.define('Bill', {
     type:         DataTypes.DECIMAL(10, 2),
     defaultValue: 0,
   },
+  paidAmount: {
+    type:         DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+  },
   status: {
-    type:         DataTypes.ENUM('unpaid', 'paid', 'cancelled'),
+    type:         DataTypes.ENUM('unpaid', 'partial', 'paid', 'cancelled'),
     defaultValue: 'unpaid',
   },
   paymentMethod: {
-    type:      DataTypes.ENUM('cash', 'upi', 'card'),
+    type:      DataTypes.ENUM('cash', 'upi', 'card', 'online'),
     allowNull: true,
   },
   paidAt: {
@@ -54,6 +62,14 @@ const Bill = sequelize.define('Bill', {
   discountAmt: {
     type:         DataTypes.DECIMAL(10, 2),
     defaultValue: 0,
+  },
+  razorpayPaymentId: {
+    type:      DataTypes.STRING(100),
+    allowNull: true,
+  },
+  razorpayOrderId: {
+    type:      DataTypes.STRING(100),
+    allowNull: true,
   },
 }, {
   tableName:  'bills',

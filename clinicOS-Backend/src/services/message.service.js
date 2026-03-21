@@ -4,7 +4,7 @@ const { MessageLog, Patient } = require('../models')
 require('dotenv').config()
 
 // ── Send email ────────────────────────────────────────────────────
-const sendEmail = async (to, subject, body) => {
+const sendEmail = async (to, subject, body, attachments = []) => {
   await transporter.sendMail({
     from:    process.env.MAIL_FROM,
     to,
@@ -28,6 +28,7 @@ const sendEmail = async (to, subject, body) => {
         </div>
       </div>
     `,
+    attachments,
   })
 }
 
@@ -111,11 +112,13 @@ const sendMessage = async ({
   templateName,
   variables,
   channels = ['email'], // default email only
+  attachments = [],
 }) => {
   try {
-    // Check patient opt-in
+    // Fetch patient with BOTH email fields: patient.email (staff-entered)
+    // and patient.user.email (portal account email)
     const patient = await Patient.findByPk(patientId, {
-      attributes: ['id', 'phone', 'optInMsg'],
+      attributes: ['id', 'phone', 'email', 'optInMsg'],
       include: [{ association: 'user', attributes: ['email'] }],
     })
 
@@ -129,14 +132,22 @@ const sendMessage = async ({
       return
     }
 
+    // Use portal account email first, fall back to staff-entered email
+    const recipientEmail = patient.user?.email || patient.email
+
     const { subject, body } = renderTemplate(templateName, variables)
 
     // Send on each requested channel
     for (const channel of channels) {
       try {
-        if (channel === 'email' && patient.user?.email) {
-          await sendEmail(patient.user.email, subject, body)
+        if (channel === 'email') {
+          if (!recipientEmail) {
+            console.log(`sendMessage: no email for patient ${patientId} — skipping email channel`)
+            continue
+          }
+          await sendEmail(recipientEmail, subject, body, attachments)
           await logMessage({ patientId, clinicId, channel: 'email', template: templateName, status: 'sent' })
+          console.log(`✅ Email sent to ${recipientEmail} — template: ${templateName}`)
         }
 
         if (channel === 'whatsapp' && patient.phone) {

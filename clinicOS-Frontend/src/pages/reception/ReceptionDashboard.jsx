@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { patientAPI, tokenAPI, adminAPI, clinicAPI } from '../../services/api'
 import ReceptionLayout from '../../layouts/ReceptionLayout'
 import {
-  Search, Plus, Phone, UserPlus, ChevronRight,
-  Activity, CheckCircle, Pause, X, Users,
-  Play, FlaskConical, AlertTriangle, IndianRupee
+  Phone, UserPlus, Search, Users, Activity, Clock, X, ChevronDown,
+  Bell, BellOff, Stethoscope, PauseCircle, PlayCircle, Pause, Play,
+  Zap, CheckCircle, IndianRupee, AlertTriangle, FlaskConical, ChevronRight, Plus
 } from 'lucide-react'
 
 const STATUS = {
@@ -67,7 +67,7 @@ export default function ReceptionDashboard() {
   const [togglingOptIn, setTogglingOptIn]   = useState(false)
   const [searchDone, setSearchDone]         = useState(false)
   const [showNewForm, setShowNewForm]       = useState(false)
-  const [newPatient, setNewPatient]         = useState({ name:'', gender:'', optInMsg: true })
+  const [newPatient, setNewPatient]         = useState({ name:'', gender:'', email:'', optInMsg: true })
   const [creatingPatient, setCreatingPatient] = useState(false)
 
   const [tokens, setTokens]                 = useState([])
@@ -77,6 +77,9 @@ export default function ReceptionDashboard() {
 
   const [doctors, setDoctors]               = useState([])
   const [selectedDoctor, setSelectedDoctor] = useState('')
+
+  const phoneInputRef = useRef(null)
+  useEffect(() => { phoneInputRef.current?.focus() }, [])
 
   // Queue controls
   const [queuePaused, setQueuePaused]       = useState(false)
@@ -144,6 +147,7 @@ export default function ReceptionDashboard() {
         phone,
         name:     newPatient.name   || undefined,
         gender:   newPatient.gender || undefined,
+        email:    newPatient.email  || undefined,
         optInMsg: newPatient.optInMsg,
       })
       setPatient({ ...res.data.data.patient, visitCount: 0, hasActiveToken: false })
@@ -320,6 +324,7 @@ export default function ReceptionDashboard() {
                 <div className="relative flex-1">
                   <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
                   <input
+                    ref={phoneInputRef}
                     type="tel"
                     value={phone}
                     onChange={e => {
@@ -354,7 +359,14 @@ export default function ReceptionDashboard() {
                       </span>
                     </div>
                     <div className="flex-1">
-                      <p className="font-body font-bold text-text-primary">{patient.name || 'Patient'}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-body font-bold text-text-primary">{patient.name || 'Patient'}</p>
+                        {patient.outstandingBalance > 0 && (
+                          <span className="flex-shrink-0 font-body text-xs font-bold bg-accent-coral/10 text-accent-coral px-2 py-0.5 rounded-pill">
+                            ₹{Number(patient.outstandingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })} due
+                          </span>
+                        )}
+                      </div>
                       <p className="font-body text-xs text-text-muted">{patient.phone}</p>
                       <div className="flex gap-3 mt-1 flex-wrap">
                         {patient.gender && <span className="font-body text-xs text-text-muted capitalize">{patient.gender}</span>}
@@ -451,6 +463,13 @@ export default function ReceptionDashboard() {
                     value={newPatient.name}
                     onChange={e => setNewPatient(p => ({ ...p, name: e.target.value }))}
                     placeholder="Name (optional)"
+                    className="w-full px-3 py-2 rounded-xl border border-cream-300 bg-white font-body text-sm focus:outline-none focus:border-crimson-400 transition-all"
+                  />
+                  <input
+                    value={newPatient.email}
+                    onChange={e => setNewPatient(p => ({ ...p, email: e.target.value }))}
+                    placeholder="Email (optional — for patient portal access)"
+                    type="email"
                     className="w-full px-3 py-2 rounded-xl border border-cream-300 bg-white font-body text-sm focus:outline-none focus:border-crimson-400 transition-all"
                   />
                   <select
@@ -591,6 +610,47 @@ export default function ReceptionDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Completed today — quick access to Bill button */}
+        {doneTokens.filter(t => t.status === 'served').length > 0 && (
+          <div className="card mt-4 max-w-7xl mx-auto">
+            <h3 className="font-display font-bold text-lg text-text-primary mb-3">Completed Today</h3>
+            <div className="space-y-2">
+              {doneTokens.filter(t => t.status === 'served').map(token => (
+                <div key={token.id} className="flex items-center gap-3 p-3 rounded-2xl bg-cream-50 border border-cream-200">
+                  <span className="font-display font-bold text-sm px-3 py-1 rounded-pill bg-accent-teal/20 text-accent-teal flex-shrink-0">
+                    T-{token.tokenNumber}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-body font-semibold text-sm text-text-primary truncate">
+                      {token.patient?.name || token.patient?.phone || 'Patient'}
+                    </p>
+                    <p className="font-body text-xs text-text-muted">
+                      Served{token.doctor && ` · Dr. ${token.doctor.name}`}
+                    </p>
+                  </div>
+                  {/* Bill state badge */}
+                  {token.billStatus === 'paid' ? (
+                    <span className="flex items-center gap-1 font-body text-xs font-bold px-3 py-1.5 rounded-xl bg-accent-teal/10 text-accent-teal flex-shrink-0">
+                      <CheckCircle size={12} /> Billed ✓
+                    </span>
+                  ) : token.billStatus === 'unpaid' ? (
+                    <span className="flex items-center gap-1 font-body text-xs font-bold px-3 py-1.5 rounded-xl bg-accent-yellow/10 text-amber-600 flex-shrink-0">
+                      <IndianRupee size={12} /> Pending
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleCreateBill(token)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent-teal text-white font-body text-xs font-bold hover:brightness-105 transition-all flex-shrink-0"
+                    >
+                      <IndianRupee size={12} /> Bill
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </ReceptionLayout>
 
       {/* ── Emergency Token Modal ─────────────────────────────── */}
@@ -705,15 +765,27 @@ function TokenRow({ token, onStatusChange, onCancel, done = false, onCreateBill 
         </div>
       )}
 
-      {/* ── Served token: show Create Bill button ─────────────── */}
+      {/* ── Served token: show Create Bill button or Status ─────────────── */}
       {token.status === 'served' && onCreateBill && (
-        <button
-          onClick={() => onCreateBill(token)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent-teal text-white font-body text-xs font-bold hover:brightness-105 transition-all flex-shrink-0"
-        >
-          <IndianRupee size={12} />
-          Bill
-        </button>
+        <>
+          {token.billStatus === 'paid' ? (
+            <span className="flex items-center gap-1 font-body text-xs font-bold px-3 py-1.5 rounded-xl bg-accent-teal/10 text-accent-teal flex-shrink-0">
+               <CheckCircle size={12} /> Billed ✓
+            </span>
+          ) : token.billStatus === 'unpaid' ? (
+            <span className="flex items-center gap-1 font-body text-xs font-bold px-3 py-1.5 rounded-xl bg-accent-yellow/10 text-amber-600 flex-shrink-0">
+               <IndianRupee size={12} /> Pending
+            </span>
+          ) : (
+            <button
+              onClick={() => onCreateBill(token)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent-teal text-white font-body text-xs font-bold hover:brightness-105 transition-all flex-shrink-0"
+            >
+              <IndianRupee size={12} />
+              Bill
+            </button>
+          )}
+        </>
       )}
     </div>
   )

@@ -15,7 +15,7 @@ const getTokens = async (req, res) => {
     const today    = new Date()
     today.setHours(0, 0, 0, 0)
 
-    const tokens = await Token.findAll({
+    const rawTokens = await Token.findAll({
       where: {
         clinicId,
         createdAt: { [Op.gte]: today },
@@ -31,12 +31,31 @@ const getTokens = async (req, res) => {
       ],
     })
 
-    // Count served today for stats
-    const servedToday = await Token.count({
-      where: { clinicId, status: 'served', createdAt: { [Op.gte]: today } },
-    })
+    // For served tokens, attach the latest bill's status so frontend
+    // can show Billed / Pending / Bill button appropriately
+    const { Bill } = require('../models')
+    const tokens = await Promise.all(
+      rawTokens.map(async (token) => {
+        const t = token.toJSON()
+        if (t.status === 'served' && t.patientId) {
+          const bill = await Bill.findOne({
+            where: {
+              tokenId:   t.id,
+              patientId: t.patientId,
+              clinicId,
+            },
+            attributes: ['id', 'status'],
+          })
 
-    const inQueue = tokens.filter(t =>
+          t.billStatus = bill?.status ?? null
+          t.billId     = bill?.id     ?? null
+        }
+        return t
+      })
+    )
+
+    const servedToday = tokens.filter(t => t.status === 'served').length
+    const inQueue     = tokens.filter(t =>
       ['waiting', 'now', 'paused', 'lab'].includes(t.status)
     ).length
 
@@ -247,10 +266,34 @@ const createEmergencyToken = async (req, res) => {
 // PATCH /api/clinic/queue/pause
 const pauseQueue = async (req, res) => {
   try {
+    const clinicId = req.user.clinicId
     await require('../models').Clinic.update(
       { queuePaused: true },
-      { where: { id: req.user.clinicId } }
+      { where: { id: clinicId } }
     )
+
+    // Notify all waiting patients
+    const today = new Date(); today.setHours(0,0,0,0)
+    const waitingTokens = await Token.findAll({
+      where: { clinicId, status: 'waiting', createdAt: { [Op.gte]: today } },
+      include: [{ association: 'patient', attributes: ['id', 'name'] }],
+    })
+    const clinic = await require('../models').Clinic.findByPk(clinicId, { attributes: ['name'] })
+    waitingTokens.forEach(t => {
+      sendMessage({
+        patientId:    t.patientId,
+        clinicId,
+        templateName: 'queue_paused',
+        variables: {
+          patient_name:   t.patient?.name || 'Patient',
+          clinic_name:    clinic?.name || 'the clinic',
+          token_number:   t.tokenNumber,
+          queue_position: t.queuePosition,
+        },
+        channels: ['email'],
+      })
+    })
+
     return success(res, { message: 'Queue paused' })
   } catch (err) {
     return error(res, 'Failed to pause queue', 500)
@@ -260,10 +303,35 @@ const pauseQueue = async (req, res) => {
 // PATCH /api/clinic/queue/resume
 const resumeQueue = async (req, res) => {
   try {
+    const clinicId = req.user.clinicId
     await require('../models').Clinic.update(
       { queuePaused: false },
-      { where: { id: req.user.clinicId } }
+      { where: { id: clinicId } }
     )
+
+    // Notify all waiting patients
+    const today = new Date(); today.setHours(0,0,0,0)
+    const waitingTokens = await Token.findAll({
+      where: { clinicId, status: 'waiting', createdAt: { [Op.gte]: today } },
+      include: [{ association: 'patient', attributes: ['id', 'name'] }],
+    })
+    const clinic = await require('../models').Clinic.findByPk(clinicId, { attributes: ['name'] })
+    waitingTokens.forEach(t => {
+      sendMessage({
+        patientId:    t.patientId,
+        clinicId,
+        templateName: 'queue_resumed',
+        variables: {
+          patient_name:    t.patient?.name || 'Patient',
+          clinic_name:     clinic?.name || 'the clinic',
+          token_number:    t.tokenNumber,
+          queue_position:  t.queuePosition,
+          estimated_wait:  t.estimatedWait || '?',
+        },
+        channels: ['email'],
+      })
+    })
+
     return success(res, { message: 'Queue resumed' })
   } catch (err) {
     return error(res, 'Failed to resume queue', 500)

@@ -42,12 +42,14 @@ Visit.belongsTo(Token,   { foreignKey: 'tokenId',   as: 'token' })
 Patient.hasMany(Visit,   { foreignKey: 'patientId', as: 'visits' })
 Token.hasOne(Visit,      { foreignKey: 'tokenId',   as: 'visit' })
 
-// Bill belongs to Patient and optionally a Visit
+// Bill belongs to Patient and optionally a Visit or Token
 Bill.belongsTo(Patient, { foreignKey: 'patientId', as: 'patient' })
 Bill.belongsTo(Visit,   { foreignKey: 'visitId',   as: 'visit' })
+Bill.belongsTo(Token,   { foreignKey: 'tokenId',   as: 'token' })
 Bill.belongsTo(Clinic,  { foreignKey: 'clinicId',  as: 'clinic' })
 Patient.hasMany(Bill,   { foreignKey: 'patientId', as: 'bills' })
 Visit.hasMany(Bill,     { foreignKey: 'visitId',   as: 'bills' })
+Token.hasMany(Bill,     { foreignKey: 'tokenId',   as: 'bills' })
 
 // MessageLog and AuditLog
 MessageLog.belongsTo(Patient, { foreignKey: 'patientId', as: 'patient' })
