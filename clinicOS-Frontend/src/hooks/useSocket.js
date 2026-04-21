@@ -30,7 +30,9 @@ export function useSocket({
     if (!user) return
 
     if (!socketInstance) {
-      socketInstance = io('http://localhost:5000', {
+      const serverUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api')
+        .replace('/api', '')
+      socketInstance = io(serverUrl, {
         withCredentials: true,
         transports:      ['websocket', 'polling'],
         reconnection:    true,
