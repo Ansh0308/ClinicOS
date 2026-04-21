@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { tokenAPI } from '../../services/api'
+import { useSocket } from '../../hooks/useSocket'
 import { Activity, Users, Clock, ChevronRight } from 'lucide-react'
 
 const STATUS_COLOR = {
@@ -18,10 +19,19 @@ export default function DoctorQueue() {
   const [loading, setLoading] = useState(true)
   const [calling, setCalling] = useState(null)
 
+  const { connected } = useSocket({
+    onQueueUpdate: (data) => {
+      const mine = data.tokens.filter(t =>
+        t.doctorId === user?.id &&
+        ['waiting', 'now', 'paused', 'lab'].includes(t.status)
+      )
+      setTokens(mine)
+    },
+  })
+
   const fetchMyQueue = useCallback(async () => {
     try {
       const res = await tokenAPI.getAll()
-      // Filter only this doctor's tokens
       const mine = res.data.data.tokens.filter(t =>
         t.doctorId === user?.id &&
         ['waiting', 'now', 'paused', 'lab'].includes(t.status)
@@ -36,8 +46,6 @@ export default function DoctorQueue() {
 
   useEffect(() => {
     fetchMyQueue()
-    const interval = setInterval(fetchMyQueue, 15000)
-    return () => clearInterval(interval)
   }, [fetchMyQueue])
 
   const currentPatient = tokens.find(t => t.status === 'now')

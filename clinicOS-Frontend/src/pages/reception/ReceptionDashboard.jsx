@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { patientAPI, tokenAPI, clinicAPI, analyticsAPI } from '../../services/api'
+import { useSocket } from '../../hooks/useSocket'
+import { useAutoRefresh } from '../../hooks/useAutoRefresh'
 import ReceptionLayout from '../../layouts/ReceptionLayout'
 import {
   Phone, UserPlus, Search, Users, Activity, Clock, X, ChevronDown,
   Bell, BellOff, Stethoscope, PauseCircle, PlayCircle, Pause, Play,
-  Zap, CheckCircle, IndianRupee, AlertTriangle, FlaskConical, ChevronRight, Plus
+  Zap, CheckCircle, IndianRupee, AlertTriangle, FlaskConical, ChevronRight, Plus, RotateCcw
 } from 'lucide-react'
 
 const STATUS = {
@@ -60,6 +62,50 @@ export default function ReceptionDashboard() {
   const navigate = useNavigate()
   const { toasts, addToast } = useToast()
 
+  const { connected } = useSocket({
+    onQueueUpdate: (data) => {
+      setTokens(data.tokens)
+      setStats(data.stats)
+    },
+    onQueuePaused: (data) => {
+      setQueuePaused(data.paused)
+    },
+    onBillUpdated: () => {
+      fetchTokens()
+    },
+  })
+
+  const [undoAvailable, setUndoAvailable] = useState(false)
+  const [undoTimer, setUndoTimer]         = useState(0)
+  const undoIntervalRef                   = useRef(null)
+
+  const startUndoWindow = () => {
+    setUndoAvailable(true)
+    setUndoTimer(10)
+    clearInterval(undoIntervalRef.current)
+    undoIntervalRef.current = setInterval(() => {
+      setUndoTimer(t => {
+        if (t <= 1) {
+          clearInterval(undoIntervalRef.current)
+          setUndoAvailable(false)
+          return 0
+        }
+        return t - 1
+      })
+    }, 1000)
+  }
+
+  const handleUndo = async () => {
+    try {
+      await tokenAPI.undo()
+      setUndoAvailable(false)
+      clearInterval(undoIntervalRef.current)
+      addToast('Action undone', 'info')
+    } catch (err) {
+      addToast(err.response?.data?.error || 'Nothing to undo', 'error')
+    }
+  }
+
   // ── State ─────────────────────────────────────────────────────
   const [phone, setPhone]                   = useState('')
   const [searching, setSearching]           = useState(false)
@@ -105,6 +151,8 @@ export default function ReceptionDashboard() {
     }
   }, [])
 
+  useAutoRefresh(fetchTokens, 30)
+
   const fetchDoctors = useCallback(async () => {
     try {
       const res = await clinicAPI.getDoctors()
@@ -127,11 +175,6 @@ export default function ReceptionDashboard() {
     fetchTokens()
     fetchDoctors()
     fetchAnalyticsSummary()
-    const interval = setInterval(() => {
-      fetchTokens()
-      fetchAnalyticsSummary()
-    }, 15000)
-    return () => clearInterval(interval)
   }, [fetchTokens, fetchDoctors, fetchAnalyticsSummary])
 
   // ── Patient search ────────────────────────────────────────────
@@ -217,7 +260,7 @@ export default function ReceptionDashboard() {
   const handleStatusChange = async (tokenId, newStatus) => {
     try {
       await tokenAPI.updateStatus(tokenId, newStatus)
-      fetchTokens()
+      startUndoWindow()
       const labels = { now:'Called', served:'Marked served', paused:'Put on hold', waiting:'Resumed', lab:'Sent to lab' }
       addToast(labels[newStatus] || 'Status updated', 'success')
     } catch (err) {
@@ -305,7 +348,7 @@ export default function ReceptionDashboard() {
 
   return (
     <>
-      <ReceptionLayout stats={stats}>
+      <ReceptionLayout stats={stats} connected={connected}>
 
         {/* Queue paused banner */}
         {queuePaused && (
@@ -597,6 +640,21 @@ export default function ReceptionDashboard() {
                   </p>
                 </div>
               </button>
+
+              {undoAvailable && (
+                <button
+                  onClick={handleUndo}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-accent-lavender/30 bg-accent-lavender/5 hover:bg-accent-lavender/10 transition-all"
+                >
+                  <div className="w-8 h-8 bg-accent-lavender/10 rounded-xl flex items-center justify-center">
+                    <RotateCcw size={16} className="text-purple-500" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="font-body text-sm font-bold text-purple-500">Undo Last Action</p>
+                    <p className="font-body text-xs text-text-muted">Available for {undoTimer}s</p>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
 

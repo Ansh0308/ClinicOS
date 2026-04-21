@@ -1,14 +1,16 @@
 const express = require('express')
+const http    = require('http')
 const cors    = require('cors')
 require('dotenv').config()
 
 const sequelize        = require('./src/config/database')
 const { errorHandler } = require('./src/middleware/error.middleware')
+const { initSocket }   = require('./src/services/socket.service')
 
-// Import all models so Sequelize registers them before sync()
 require('./src/models/index')
 
-const app = express()
+const app    = express()
+const server = http.createServer(app)
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors({
@@ -56,7 +58,10 @@ const start = async () => {
     await sequelize.sync({ alter: { drop: false } })
     console.log('✅ All tables synced')
 
-    const server = app.listen(PORT, () => {
+    initSocket(server)
+    console.log('✅ Socket.IO initialized')
+
+    server.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`)
     })
     

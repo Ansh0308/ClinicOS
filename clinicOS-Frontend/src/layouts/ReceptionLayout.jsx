@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Stethoscope, LogOut } from 'lucide-react'
 
-export default function ReceptionLayout({ children, stats }) {
+export default function ReceptionLayout({ children, stats, connected }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
@@ -33,6 +33,12 @@ export default function ReceptionLayout({ children, stats }) {
         )}
 
         <div className="flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-pill">
+            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-accent-teal animate-pulse' : 'bg-accent-coral'}`} />
+            <span className="font-body text-white/80 text-xs font-medium">
+              {connected ? 'Live' : 'Reconnecting...'}
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 bg-accent-teal rounded-full animate-pulse" />
             <span className="hidden md:block font-body text-sm text-white">{user?.name}</span>

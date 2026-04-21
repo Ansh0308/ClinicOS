@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { patientPortalAPI } from '../../services/api'
+import { useSocket } from '../../hooks/useSocket'
 import { Activity, Clock, CheckCircle, FlaskConical, LogOut, Bell } from 'lucide-react'
 
 const STATUS_UI = {
@@ -48,9 +49,37 @@ export default function QueueTracker() {
 
   useEffect(() => {
     fetchToken()
-    const interval = setInterval(fetchToken, 20000)
+    const interval = setInterval(fetchToken, 30000)
     return () => clearInterval(interval)
   }, [fetchToken])
+
+  const { connected } = useSocket({
+    onTokenNew: () => {
+      // Staff just issued a token for this patient — load it immediately
+      fetchToken()
+    },
+    onTokenPosition: (data) => {
+      setTokenData(prev => {
+        if (!prev || prev.id !== data.tokenId) return prev
+        setLastUpdated(new Date())
+        return {
+          ...prev,
+          status:        data.status,
+          queuePosition: data.queuePosition,
+          estimatedWait: data.estimatedWait,
+          tokensAhead:   data.tokensAhead,
+          livePosition:  data.livePosition,
+        }
+      })
+    },
+    onTokenServed: (data) => {
+      setTokenData(prev => {
+        if (!prev || prev.id !== data.tokenId) return prev
+        return { ...prev, status: 'served' }
+      })
+      setLastUpdated(new Date())
+    },
+  })
 
   const handleLeaveQueue = async () => {
     if (!window.confirm('Are you sure you want to leave the queue? You will lose your position.')) return
@@ -98,7 +127,6 @@ export default function QueueTracker() {
         </p>
       </div>
 
-      {/* Main token card */}
       <div className={`rounded-3xl p-6 text-center ${ui.bg} border-2 border-current/10`}>
         <p className="text-5xl mb-2">{ui.emoji}</p>
         <p className={`font-body text-sm font-bold uppercase tracking-widest mb-2 ${ui.color}`}>
@@ -110,7 +138,6 @@ export default function QueueTracker() {
         <p className="font-body text-sm text-text-muted">{ui.message}</p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
         <div className="card text-center py-4">
           <p className="font-body text-xs text-text-muted mb-1 flex items-center justify-center gap-1">
@@ -135,7 +162,6 @@ export default function QueueTracker() {
         </div>
       </div>
 
-      {/* Tokens ahead */}
       {tokenData.status === 'waiting' && tokenData.tokensAhead >= 0 && (
         <div className="card">
           <p className="font-body text-sm text-text-muted text-center mb-3">
@@ -159,7 +185,6 @@ export default function QueueTracker() {
         </div>
       )}
 
-      {/* Notify me toggle */}
       {tokenData.status === 'waiting' && (
         <div className="card flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -187,7 +212,6 @@ export default function QueueTracker() {
         </div>
       )}
 
-      {/* Journey steps */}
       <div className="card">
         <p className="font-body text-xs font-bold uppercase tracking-wider text-text-muted mb-4">
           Your Journey
@@ -220,7 +244,6 @@ export default function QueueTracker() {
         </div>
       </div>
 
-      {/* Leave queue — only when waiting or paused */}
       {['waiting', 'paused'].includes(tokenData.status) && (
         <button
           onClick={handleLeaveQueue}
@@ -236,7 +259,8 @@ export default function QueueTracker() {
 
       {lastUpdated && (
         <p className="font-body text-xs text-text-muted text-center">
-          Auto-updates every 20s · {lastUpdated.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}
+          <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${connected ? 'bg-accent-teal' : 'bg-accent-coral'}`} />
+          {connected ? 'Live' : 'Reconnecting...'} · Updated {lastUpdated.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}
         </p>
       )}
     </div>

@@ -1,5 +1,5 @@
 const { success, error } = require('../utils/apiResponse')
-const { Token, Patient, User, Clinic } = require('../models')
+const { Token, Patient, User, Clinic, Bill } = require('../models')
 const { Op } = require('sequelize')
 const {
   getNextTokenNumber,
@@ -7,6 +7,8 @@ const {
   recalculatePositions,
 } = require('../services/token.service')
 const { sendMessage } = require('../services/message.service')
+const { emitQueueUpdate, emitNewToken } = require('../services/queueEmit.service')
+const { saveUndoState, getUndoState, clearUndoState } = require('../services/undo.service')
 
 // GET /api/tokens
 const getTokens = async (req, res) => {
@@ -144,6 +146,9 @@ const createToken = async (req, res) => {
       console.error('Token message trigger failed:', err.message)
     }
 
+    await emitQueueUpdate(clinicId)
+    await emitNewToken(full.toJSON())   // notify the specific patient in real-time
+
     return success(res, { token: full }, 201)
   } catch (err) {
     console.error('createToken error:', err.message)
@@ -165,6 +170,12 @@ const updateTokenStatus = async (req, res) => {
 
     const token = await Token.findOne({ where: { id, clinicId } })
     if (!token) return error(res, 'Token not found', 404)
+
+    saveUndoState(clinicId, {
+      tokenId:          token.id,
+      previousStatus:   token.status,
+      previousPosition: token.queuePosition,
+    })
 
     const updates = { status }
 
@@ -202,6 +213,8 @@ const updateTokenStatus = async (req, res) => {
       }
     }
 
+    await emitQueueUpdate(clinicId)
+
     return success(res, { message: 'Token status updated', token })
   } catch (err) {
     console.error('updateTokenStatus error:', err.message)
@@ -219,6 +232,7 @@ const deleteToken = async (req, res) => {
 
     await token.update({ status: 'cancelled' })
     await recalculatePositions(clinicId)
+    await emitQueueUpdate(clinicId)
 
     return success(res, { message: 'Token cancelled' })
   } catch (err) {
@@ -255,6 +269,8 @@ const createEmergencyToken = async (req, res) => {
       estimatedWait: 0,
       issuedAt:      new Date(),
     })
+
+    await emitQueueUpdate(clinicId)
 
     return success(res, { token }, 201)
   } catch (err) {
@@ -294,6 +310,8 @@ const pauseQueue = async (req, res) => {
       })
     })
 
+    emitToClinic(clinicId, 'queue:paused', { paused: true })
+
     return success(res, { message: 'Queue paused' })
   } catch (err) {
     return error(res, 'Failed to pause queue', 500)
@@ -332,9 +350,41 @@ const resumeQueue = async (req, res) => {
       })
     })
 
+    emitToClinic(clinicId, 'queue:paused', { paused: false })
+
     return success(res, { message: 'Queue resumed' })
   } catch (err) {
     return error(res, 'Failed to resume queue', 500)
+  }
+}
+
+const undoLastAction = async (req, res) => {
+  const clinicId = req.user.clinicId
+
+  const undoState = getUndoState(clinicId)
+  if (!undoState) {
+    return error(res, 'Nothing to undo — the 10-second window has expired', 400)
+  }
+
+  try {
+    const token = await Token.findOne({ where: { id: undoState.tokenId, clinicId } })
+    if (!token) return error(res, 'Token not found', 404)
+
+    await token.update({
+      status:        undoState.previousStatus,
+      queuePosition: undoState.previousPosition,
+      calledAt:      undoState.previousStatus !== 'now' ? null : token.calledAt,
+      servedAt:      undoState.previousStatus !== 'served' ? null : token.servedAt,
+    })
+
+    await recalculatePositions(clinicId)
+    clearUndoState(clinicId)
+    await emitQueueUpdate(clinicId)
+
+    return success(res, { message: 'Action undone successfully' })
+  } catch (err) {
+    console.error('undoLastAction error:', err.message)
+    return error(res, 'Undo failed', 500)
   }
 }
 
@@ -346,4 +396,5 @@ module.exports = {
   createEmergencyToken,
   pauseQueue,
   resumeQueue,
+  undoLastAction,
 }

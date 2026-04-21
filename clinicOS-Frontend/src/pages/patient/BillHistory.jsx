@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { patientPortalAPI } from '../../services/api'
 import { useRazorpay } from '../../hooks/useRazorpay'
+import { useSocket } from '../../hooks/useSocket'
+import { useAutoRefresh } from '../../hooks/useAutoRefresh'
 import { Receipt, CheckCircle, IndianRupee, X, AlertCircle } from 'lucide-react'
 
 const PAYMENT_METHODS = [
@@ -15,19 +17,27 @@ export default function BillHistory() {
   const [payingBill, setPayingBill]       = useState(null)
   const [paymentMethod, setPaymentMethod] = useState('upi')
   const [processing, setProcessing]       = useState(false)
-  const [paidSuccess, setPaidSuccess]     = useState(null)
-  const [errorMsg, setErrorMsg]           = useState('')
+  const [paidSuccess, setPaidSuccess]   = useState(null)
+  const [errorMsg, setErrorMsg]         = useState('')
 
   const { openCheckout } = useRazorpay()
 
-  const fetchBills = () => {
-    patientPortalAPI.getBills()
+  const fetchBills = useCallback(() => {
+    return patientPortalAPI.getBills()
       .then(res => setBills(res.data.data.bills))
       .catch(console.error)
       .finally(() => setLoading(false))
-  }
+  }, [])
 
-  useEffect(() => { fetchBills() }, [])
+  useEffect(() => { fetchBills() }, [fetchBills])
+
+  useSocket({
+    onBillsUpdated: (data) => {
+      setBills(data.bills)
+    },
+  })
+
+  useAutoRefresh(fetchBills, 30)
 
   // ── Online payment via Razorpay ──────────────────────────────────
   const handlePayOnline = async () => {

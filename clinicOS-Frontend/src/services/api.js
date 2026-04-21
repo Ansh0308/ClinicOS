@@ -89,6 +89,7 @@ export const tokenAPI = {
   cancel:     (id)            => api.delete(`/tokens/${id}`),
   pause:      ()              => api.patch('/tokens/queue/pause'),
   resume:     ()              => api.patch('/tokens/queue/resume'),
+  undo:       ()              => api.post('/tokens/undo'),
 }
 
 export const visitAPI = {

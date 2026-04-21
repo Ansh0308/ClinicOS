@@ -1,1088 +1,695 @@
-Good. I have everything I need from the PRD. Let me map exactly what F7 requires vs what we need to build.
+The root cause is clear — socket emissions are missing from several controllers. Let me trace every event that needs real-time sync and fix all of them at once.
 
 ---
 
-## What F7 Requires (from PRD §5)
+## All Events That Need Real-time Sync
 
 ```
-KPI Cards:
-  - Patients today
-  - Revenue today / week / month
-  - Average wait time
-  - Token throughput
-  - No-show rate
-  - Doctor utilisation
-  - Queue health RAG indicator (Red/Amber/Green)
-  - Message delivery stats
-
-Charts (exact types from PRD):
-  - Revenue → bar chart by day
-  - Avg wait time → line trend
-  - Top complaints → horizontal bar (top 10)
-  - Throughput → area chart by hour of day
-
-Filters:
-  - Date range: Today / 7 days / 30 days / Custom
-  - Doctor filter
-
-Export:
-  - CSV export of current view
-
-Staff sees simplified version:
-  - Patients today, revenue today, queue health only
-
-Role-based visibility:
-  - Revenue metrics → Admin only
-  - Patient counts + queue stats → Staff too
+Staff issues token        → queue updates (staff + doctor + patient dashboard)
+Staff changes token status → same
+Doctor completes consult  → token marked served (staff + patient)
+Staff creates bill        → patient bills list updates
+Patient or staff pays bill → patient bills list + staff "Completed Today" updates
+Queue pause/resume        → all dashboards
 ```
+
+Right now only `token.controller.js` has emissions. The **visit controller** and **bill controller** have zero socket calls.
 
 ---
 
-## Install Recharts
+## Fix 1 — `server/src/controllers/visit.controller.js`
 
-```bash
-cd client
-npm install recharts
-```
-
----
-
-## Backend
-
-### 1. `server/src/controllers/analytics.controller.js`
+Add socket emission when consultation is completed:
 
 ```js
-const { success, error } = require('../utils/apiResponse')
-const { Token, Visit, Bill, Patient, User, MessageLog } = require('../models')
-const { Op, fn, col, literal } = require('sequelize')
-const sequelize = require('../config/database')
+const { emitToClinic, emitToPatient } = require('../services/socket.service')
+const { recalculatePositions }         = require('../services/token.service')
 
-// ── Helper: get date range ────────────────────────────────────────
-const getDateRange = (range, customStart, customEnd) => {
-  const now   = new Date()
-  const today = new Date(now)
+// At the top of the file, add this helper
+// (same as in token.controller — we'll refactor to shared later)
+const buildAndEmitQueue = async (clinicId) => {
+  const { Token } = require('../models')
+  const { Op }    = require('sequelize')
+
+  const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  switch (range) {
-    case 'today':
-      return { start: today, end: now }
-    case '7days': {
-      const start = new Date(today)
-      start.setDate(start.getDate() - 6)
-      return { start, end: now }
+  const tokens = await Token.findAll({
+    where: {
+      clinicId,
+      createdAt: { [Op.gte]: today },
+    },
+    include: [
+      { association: 'patient', attributes: ['id', 'name', 'phone'] },
+      { association: 'doctor',  attributes: ['id', 'name'] },
+    ],
+    order: [
+      ['status', 'ASC'],
+      ['queuePosition', 'ASC'],
+      ['createdAt', 'ASC'],
+    ],
+  })
+
+  const servedToday = tokens.filter(t => t.status === 'served').length
+  const inQueue     = tokens.filter(t =>
+    ['waiting','now','paused','lab'].includes(t.status)
+  ).length
+
+  // Broadcast full queue to clinic staff and doctors
+  emitToClinic(clinicId, 'queue:updated', {
+    tokens,
+    stats: { inQueue, servedToday },
+  })
+
+  // Send private position update to each waiting patient
+  for (const token of tokens) {
+    if (['waiting','now','paused','lab'].includes(token.status) && token.patientId) {
+      const tokensAhead = tokens.filter(t =>
+        t.status === 'waiting' &&
+        (t.queuePosition || 0) < (token.queuePosition || 0)
+      ).length
+
+      emitToPatient(token.patientId, 'token:position', {
+        tokenId:       token.id,
+        tokenNumber:   token.tokenNumber,
+        status:        token.status,
+        queuePosition: token.queuePosition,
+        estimatedWait: token.estimatedWait,
+        tokensAhead,
+        livePosition:  tokensAhead + (token.status === 'waiting' ? 1 : 0),
+      })
     }
-    case '30days': {
-      const start = new Date(today)
-      start.setDate(start.getDate() - 29)
-      return { start, end: now }
+
+    // Patient's token just got served — notify them
+    if (token.status === 'served' && token.patientId) {
+      emitToPatient(token.patientId, 'token:served', {
+        tokenId:     token.id,
+        tokenNumber: token.tokenNumber,
+        message:     'Your consultation is complete',
+      })
     }
-    case 'custom':
-      return {
-        start: customStart ? new Date(customStart) : today,
-        end:   customEnd   ? new Date(customEnd)   : now,
-      }
-    default:
-      return { start: today, end: now }
   }
 }
+```
 
-// ── GET /api/analytics/overview ──────────────────────────────────
-const getOverview = async (req, res) => {
-  const { range = 'today', doctorId, customStart, customEnd } = req.query
-  const clinicId = req.user.clinicId
-  const { start, end } = getDateRange(range, customStart, customEnd)
+Now update `completeVisit` to emit after completion:
 
-  // Previous period for trend calculation
-  const periodMs    = end - start
-  const prevStart   = new Date(start - periodMs)
-  const prevEnd     = new Date(start)
+```js
+const completeVisit = async (req, res) => {
+  const { id } = req.params
 
   try {
-    const tokenWhere = { clinicId, createdAt: { [Op.between]: [start, end] } }
-    const billWhere  = { clinicId, createdAt: { [Op.between]: [start, end] } }
-    if (doctorId) tokenWhere.doctorId = doctorId
-
-    const [
-      totalTokens,
-      servedTokens,
-      cancelledTokens,
-      totalRevenue,
-      paidBills,
-      newPatients,
-      messageStats,
-      prevServed,
-      prevRevenue,
-    ] = await Promise.all([
-      // Total tokens issued
-      Token.count({ where: tokenWhere }),
-
-      // Served tokens
-      Token.count({ where: { ...tokenWhere, status: 'served' } }),
-
-      // Cancelled / no-show tokens
-      Token.count({ where: { ...tokenWhere, status: 'cancelled' } }),
-
-      // Revenue (sum of paid bills)
-      Bill.sum('total', { where: { ...billWhere, status: 'paid' } }),
-
-      // Number of paid bills
-      Bill.count({ where: { ...billWhere, status: 'paid' } }),
-
-      // New patients registered
-      Patient.count({ where: { clinicId, createdAt: { [Op.between]: [start, end] } } }),
-
-      // Message delivery stats
-      MessageLog.findAll({
-        where:      { clinicId, sentAt: { [Op.between]: [start, end] } },
-        attributes: ['status', [fn('COUNT', col('id')), 'count']],
-        group:      ['status'],
-        raw:        true,
-      }),
-
-      // Previous period served (for trend)
-      Token.count({ where: { clinicId, status: 'served', createdAt: { [Op.between]: [prevStart, prevEnd] } } }),
-
-      // Previous period revenue (for trend)
-      Bill.sum('total', { where: { clinicId, status: 'paid', createdAt: { [Op.between]: [prevStart, prevEnd] } } }),
-    ])
-
-    // Average wait time calculation
-    const servedWithTimes = await Token.findAll({
-      where: {
-        ...tokenWhere,
-        status:   'served',
-        calledAt: { [Op.ne]: null },
-        issuedAt: { [Op.ne]: null },
-      },
-      attributes: ['issuedAt', 'calledAt'],
-      raw: true,
+    const visit = await Visit.findOne({
+      where: { id, doctorId: req.user.id },
     })
 
-    let avgWaitMins = 0
-    if (servedWithTimes.length > 0) {
-      const totalWait = servedWithTimes.reduce((sum, t) => {
-        const wait = (new Date(t.calledAt) - new Date(t.issuedAt)) / 1000 / 60
-        return sum + wait
-      }, 0)
-      avgWaitMins = Math.round(totalWait / servedWithTimes.length)
+    if (!visit)           return error(res, 'Visit not found', 404)
+    if (visit.isComplete) return error(res, 'Already completed', 400)
+
+    await visit.update({ isComplete: true })
+
+    // Mark the linked token as served
+    if (visit.tokenId) {
+      await Token.update(
+        { status: 'served', servedAt: new Date() },
+        { where: { id: visit.tokenId } }
+      )
+
+      // Recalculate queue positions after serving
+      await recalculatePositions(visit.clinicId)
     }
 
-    // No-show rate
-    const noShowRate = totalTokens > 0
-      ? Math.round((cancelledTokens / totalTokens) * 100)
-      : 0
+    // ── Emit real-time update to all dashboards ───────────────────
+    await buildAndEmitQueue(visit.clinicId)
 
-    // Queue health RAG
-    let queueHealth = 'green'
-    if (avgWaitMins > 45)      queueHealth = 'red'
-    else if (avgWaitMins > 25) queueHealth = 'amber'
-
-    // Message stats
-    const msgSent   = messageStats.find(m => m.status === 'sent')?.count   || 0
-    const msgFailed = messageStats.find(m => m.status === 'failed')?.count || 0
-
-    // Trends (percentage change vs previous period)
-    const revenueTrend = prevRevenue > 0
-      ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 100)
-      : 0
-    const patientTrend = prevServed > 0
-      ? Math.round(((servedTokens - prevServed) / prevServed) * 100)
-      : 0
-
-    return success(res, {
-      kpis: {
-        patientsToday:   servedTokens,
-        totalTokens,
-        revenue:         totalRevenue || 0,
-        paidBills,
-        newPatients,
-        avgWaitMins,
-        noShowRate,
-        cancelledTokens,
-        queueHealth,
-        messagesSent:    parseInt(msgSent),
-        messagesFailed:  parseInt(msgFailed),
-      },
-      trends: { revenue: revenueTrend, patients: patientTrend },
-      range,
-    })
+    return success(res, { message: 'Visit completed' })
   } catch (err) {
-    console.error('getOverview error:', err.message)
-    return error(res, 'Failed to fetch overview', 500)
+    console.error('completeVisit error:', err.message)
+    return error(res, 'Failed to complete visit', 500)
   }
 }
+```
 
-// ── GET /api/analytics/revenue ────────────────────────────────────
-const getRevenue = async (req, res) => {
-  const { range = '7days', doctorId, customStart, customEnd } = req.query
-  const clinicId = req.user.clinicId
-  const { start, end } = getDateRange(range, customStart, customEnd)
+---
 
+## Fix 2 — `server/src/controllers/bill.controller.js`
+
+Add socket emissions when bills are created and paid:
+
+```js
+const { emitToClinic, emitToPatient } = require('../services/socket.service')
+
+// Helper: emit bill update to patient's private room
+const emitBillUpdate = async (patientId, clinicId) => {
+  const { Bill } = require('../models')
+
+  const bills = await Bill.findAll({
+    where:   { patientId, clinicId },
+    include: [{ association: 'clinic', attributes: ['id', 'name'] }],
+    order:   [['createdAt', 'DESC']],
+  })
+
+  emitToPatient(patientId, 'bills:updated', { bills })
+
+  // Also notify clinic staff that bill list changed
+  emitToClinic(clinicId, 'bill:updated', {
+    patientId,
+    message: 'Bill status changed',
+  })
+}
+```
+
+In `createBill` — emit after bill creation:
+
+```js
+const createBill = async (req, res) => {
+  // ... existing code ...
+
+  const bill = await Bill.create({
+    patientId,
+    clinicId,
+    visitId:  visitId || null,
+    items:    processedItems,
+    subtotal,
+    tax,
+    total,
+    status:   'unpaid',
+  })
+
+  // ── Real-time: notify patient a new bill exists ────────────────
   try {
-    const bills = await Bill.findAll({
+    await emitBillUpdate(patientId, clinicId)
+  } catch (e) {
+    console.error('Bill socket emit failed:', e.message)
+  }
+
+  return success(res, { bill }, 201)
+}
+```
+
+In `markPaid` — emit after payment:
+
+```js
+const markPaid = async (req, res) => {
+  // ... existing code including sendMessage ...
+
+  await bill.update({
+    status:        'paid',
+    paymentMethod,
+    paidAt:        new Date(),
+  })
+
+  // ── Real-time: notify patient bill is paid ─────────────────────
+  try {
+    await emitBillUpdate(bill.patientId, clinicId)
+
+    // Also refresh the queue board for staff
+    // (so "Billed" badge appears on served token row)
+    const { Token } = require('../models')
+    const { Op }    = require('sequelize')
+    const today     = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const tokens = await Token.findAll({
       where: {
         clinicId,
-        status:    'paid',
-        paidAt:    { [Op.between]: [start, end] },
+        createdAt: { [Op.gte]: today },
       },
-      attributes: [
-        [fn('DATE', col('paidAt')), 'date'],
-        [fn('SUM', col('total')),   'revenue'],
-        [fn('COUNT', col('id')),    'count'],
+      include: [
+        { association: 'patient', attributes: ['id', 'name', 'phone'] },
+        { association: 'doctor',  attributes: ['id', 'name'] },
       ],
-      group:  [fn('DATE', col('paidAt'))],
-      order:  [[fn('DATE', col('paidAt')), 'ASC']],
-      raw:    true,
+      order: [['status', 'ASC'], ['queuePosition', 'ASC'], ['createdAt', 'ASC']],
     })
 
-    return success(res, { data: bills })
-  } catch (err) {
-    console.error('getRevenue error:', err.message)
-    return error(res, 'Failed to fetch revenue', 500)
-  }
-}
+    const servedToday = tokens.filter(t => t.status === 'served').length
+    const inQueue     = tokens.filter(t =>
+      ['waiting','now','paused','lab'].includes(t.status)
+    ).length
 
-// ── GET /api/analytics/queue ──────────────────────────────────────
-const getQueueStats = async (req, res) => {
-  const { range = '7days', doctorId, customStart, customEnd } = req.query
-  const clinicId = req.user.clinicId
-  const { start, end } = getDateRange(range, customStart, customEnd)
+    emitToClinic(clinicId, 'queue:updated', {
+      tokens,
+      stats: { inQueue, servedToday },
+    })
+  } catch (e) {
+    console.error('Payment socket emit failed:', e.message)
+  }
+
+  return success(res, { bill, message: 'Payment recorded' })
+}
+```
+
+Also update `initiatePayment` in `patientPortal.controller.js` (patient self-pays):
+
+```js
+const initiatePayment = async (req, res) => {
+  // ... existing code ...
+
+  await bill.update({
+    status:        'paid',
+    paymentMethod,
+    paidAt:        new Date(),
+  })
+
+  // ── Real-time: update both patient and clinic staff ───────────
+  try {
+    const { emitToPatient, emitToClinic } = require('../services/socket.service')
+    const { Bill } = require('../models')
+
+    const bills = await Bill.findAll({
+      where:   { patientId: patient.id, clinicId: bill.clinicId },
+      include: [{ association: 'clinic', attributes: ['id', 'name'] }],
+      order:   [['createdAt', 'DESC']],
+    })
+
+    emitToPatient(patient.id, 'bills:updated', { bills })
+    emitToClinic(bill.clinicId, 'bill:updated', {
+      patientId: patient.id,
+      message:   'Patient paid bill',
+    })
+  } catch (e) {
+    console.error('Payment socket emit failed:', e.message)
+  }
+
+  // trigger receipt email
+  // ...
+}
+```
+
+---
+
+## Fix 3 — Shared `emitQueueUpdate` utility
+
+The same queue-building logic is now in 3 files. Extract it to avoid drift:
+
+Create `server/src/services/queueEmit.service.js`:
+
+```js
+const { emitToClinic, emitToPatient } = require('./socket.service')
+
+const emitQueueUpdate = async (clinicId) => {
+  const { Token } = require('../models')
+  const { Op }    = require('sequelize')
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
   try {
-    const where = {
-      clinicId,
-      status:    'served',
-      calledAt:  { [Op.ne]: null },
-      issuedAt:  { [Op.ne]: null },
-      createdAt: { [Op.between]: [start, end] },
-    }
-    if (doctorId) where.doctorId = doctorId
-
-    // Avg wait by day
-    const tokensByDay = await Token.findAll({
-      where,
-      attributes: [
-        [fn('DATE', col('createdAt')), 'date'],
-        [fn('COUNT', col('id')),       'count'],
-        'issuedAt',
-        'calledAt',
+    const tokens = await Token.findAll({
+      where: {
+        clinicId,
+        createdAt: { [Op.gte]: today },
+      },
+      include: [
+        { association: 'patient', attributes: ['id', 'name', 'phone'] },
+        { association: 'doctor',  attributes: ['id', 'name'] },
       ],
-      raw: true,
-    })
-
-    // Group and calculate avg wait per day
-    const dayMap = {}
-    tokensByDay.forEach(t => {
-      const d    = t.date
-      const wait = (new Date(t.calledAt) - new Date(t.issuedAt)) / 1000 / 60
-      if (!dayMap[d]) dayMap[d] = { date: d, totalWait: 0, count: 0 }
-      dayMap[d].totalWait += wait
-      dayMap[d].count     += 1
-    })
-
-    const avgWaitByDay = Object.values(dayMap).map(d => ({
-      date:    d.date,
-      avgWait: Math.round(d.totalWait / d.count),
-      count:   d.count,
-    })).sort((a, b) => a.date.localeCompare(b.date))
-
-    // Throughput by hour (tokens created per hour of day)
-    const tokensByHour = await Token.findAll({
-      where: { clinicId, createdAt: { [Op.between]: [start, end] } },
-      attributes: [
-        [fn('HOUR', col('createdAt')), 'hour'],
-        [fn('COUNT', col('id')),       'count'],
+      order: [
+        ['status', 'ASC'],
+        ['queuePosition', 'ASC'],
+        ['createdAt', 'ASC'],
       ],
-      group: [fn('HOUR', col('createdAt'))],
-      order: [[fn('HOUR', col('createdAt')), 'ASC']],
-      raw:   true,
     })
 
-    // Fill all 24 hours
-    const hourMap = {}
-    for (let h = 0; h < 24; h++) hourMap[h] = { hour: h, count: 0 }
-    tokensByHour.forEach(t => { hourMap[t.hour].count = parseInt(t.count) })
-    const throughputByHour = Object.values(hourMap)
+    const servedToday = tokens.filter(t => t.status === 'served').length
+    const inQueue     = tokens.filter(t =>
+      ['waiting','now','paused','lab'].includes(t.status)
+    ).length
 
-    return success(res, { avgWaitByDay, throughputByHour })
-  } catch (err) {
-    console.error('getQueueStats error:', err.message)
-    return error(res, 'Failed to fetch queue stats', 500)
-  }
-}
-
-// ── GET /api/analytics/complaints ────────────────────────────────
-const getTopComplaints = async (req, res) => {
-  const { range = '7days', doctorId, customStart, customEnd } = req.query
-  const clinicId = req.user.clinicId
-  const { start, end } = getDateRange(range, customStart, customEnd)
-
-  try {
-    const visitWhere = {
-      clinicId,
-      createdAt:  { [Op.between]: [start, end] },
-      isComplete: true,
-    }
-    if (doctorId) visitWhere.doctorId = doctorId
-
-    // Get all complaint tags from visits in range
-    const visits = await Visit.findAll({
-      where:      visitWhere,
-      attributes: ['complaintTags', 'complaint'],
-      raw:        true,
+    // Emit to all clinic users (staff + doctors)
+    emitToClinic(clinicId, 'queue:updated', {
+      tokens,
+      stats: { inQueue, servedToday },
     })
 
-    // Count tag frequency
-    const tagCount = {}
-    visits.forEach(v => {
-      const tags = Array.isArray(v.complaintTags)
-        ? v.complaintTags
-        : (typeof v.complaintTags === 'string' ? JSON.parse(v.complaintTags || '[]') : [])
-
-      tags.forEach(tag => {
-        if (tag) tagCount[tag] = (tagCount[tag] || 0) + 1
-      })
-
-      // Also extract keywords from free-text complaint
-      if (v.complaint) {
-        const words = v.complaint.toLowerCase()
-          .split(/[\s,;.]+/)
-          .filter(w => w.length > 3)
-        words.forEach(w => { tagCount[w] = (tagCount[w] || 0) + 0.5 })
-      }
-    })
-
-    // Top 10 by count
-    const topComplaints = Object.entries(tagCount)
-      .map(([name, count]) => ({ name, count: Math.round(count) }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10)
-
-    return success(res, { topComplaints, totalVisits: visits.length })
-  } catch (err) {
-    console.error('getTopComplaints error:', err.message)
-    return error(res, 'Failed to fetch complaints', 500)
-  }
-}
-
-// ── GET /api/analytics/doctors ────────────────────────────────────
-const getDoctorStats = async (req, res) => {
-  const { range = '7days', customStart, customEnd } = req.query
-  const clinicId = req.user.clinicId
-  const { start, end } = getDateRange(range, customStart, customEnd)
-
-  try {
-    const doctors = await User.findAll({
-      where:      { clinicId, role: 'doctor', status: 'approved' },
-      attributes: ['id', 'name'],
-    })
-
-    const doctorStats = await Promise.all(
-      doctors.map(async (doc) => {
-        const [served, avgWaitData, revenue] = await Promise.all([
-          Token.count({
-            where: {
-              clinicId,
-              doctorId:  doc.id,
-              status:    'served',
-              createdAt: { [Op.between]: [start, end] },
-            },
-          }),
-
-          Token.findAll({
-            where: {
-              clinicId,
-              doctorId:  doc.id,
-              status:    'served',
-              calledAt:  { [Op.ne]: null },
-              issuedAt:  { [Op.ne]: null },
-              createdAt: { [Op.between]: [start, end] },
-            },
-            attributes: ['issuedAt', 'calledAt'],
-            raw: true,
-          }),
-
-          Bill.sum('total', {
-            where: {
-              clinicId,
-              status:    'paid',
-              createdAt: { [Op.between]: [start, end] },
-              // Bills linked to this doctor's visits
-              visitId: {
-                [Op.in]: literal(
-                  `(SELECT id FROM visits WHERE doctorId = '${doc.id}' AND clinicId = '${clinicId}')`
-                ),
-              },
-            },
-          }),
-        ])
-
-        let avgWait = 0
-        if (avgWaitData.length > 0) {
-          const total = avgWaitData.reduce((s, t) => {
-            return s + (new Date(t.calledAt) - new Date(t.issuedAt)) / 1000 / 60
-          }, 0)
-          avgWait = Math.round(total / avgWaitData.length)
-        }
-
-        return {
-          id:          doc.id,
-          name:        doc.name,
-          patientsServed: served,
-          avgWaitMins: avgWait,
-          revenue:     revenue || 0,
-        }
-      })
+    // Emit private position to each waiting patient
+    const waitingTokens = tokens.filter(t =>
+      ['waiting','now','paused','lab'].includes(t.status) && t.patientId
     )
 
-    return success(res, { doctors: doctorStats })
+    for (const token of waitingTokens) {
+      const tokensAhead = tokens.filter(t =>
+        t.status === 'waiting' &&
+        (t.queuePosition || 0) < (token.queuePosition || 0)
+      ).length
+
+      emitToPatient(token.patientId, 'token:position', {
+        tokenId:       token.id,
+        tokenNumber:   token.tokenNumber,
+        status:        token.status,
+        queuePosition: token.queuePosition,
+        estimatedWait: token.estimatedWait,
+        tokensAhead,
+        livePosition:  tokensAhead + (token.status === 'waiting' ? 1 : 0),
+      })
+    }
+
+    // Notify patients whose token was just served
+    const servedTokens = tokens.filter(t => t.status === 'served' && t.patientId)
+    for (const token of servedTokens) {
+      emitToPatient(token.patientId, 'token:served', {
+        tokenId:     token.id,
+        tokenNumber: token.tokenNumber,
+      })
+    }
   } catch (err) {
-    console.error('getDoctorStats error:', err.message)
-    return error(res, 'Failed to fetch doctor stats', 500)
+    console.error('emitQueueUpdate error:', err.message)
   }
 }
 
-module.exports = {
-  getOverview,
-  getRevenue,
-  getQueueStats,
-  getTopComplaints,
-  getDoctorStats,
+module.exports = { emitQueueUpdate }
+```
+
+Now update all three controllers to use this shared function instead of duplicating the logic:
+
+In `token.controller.js`:
+```js
+const { emitQueueUpdate } = require('../services/queueEmit.service')
+// Replace all the inline buildAndEmitQueue calls with:
+// await emitQueueUpdate(clinicId)
+```
+
+In `visit.controller.js`:
+```js
+const { emitQueueUpdate } = require('../services/queueEmit.service')
+// Replace buildAndEmitQueue with:
+// await emitQueueUpdate(visit.clinicId)
+```
+
+---
+
+## Fix 4 — Frontend: listen for all socket events
+
+### Update `useSocket.js`
+
+Add `onBillsUpdated` and `onTokenServed` handlers:
+
+```js
+export function useSocket({
+  onQueueUpdate,
+  onQueuePaused,
+  onTokenPosition,
+  onBillsUpdated,   // ← new
+  onTokenServed,    // ← new
+  onBillUpdated,    // ← new (for staff — bill status changed)
+} = {}) {
+  const { user }    = useAuth()
+  const handlersRef = useRef({
+    onQueueUpdate, onQueuePaused, onTokenPosition,
+    onBillsUpdated, onTokenServed, onBillUpdated,
+  })
+
+  useEffect(() => {
+    handlersRef.current = {
+      onQueueUpdate, onQueuePaused, onTokenPosition,
+      onBillsUpdated, onTokenServed, onBillUpdated,
+    }
+  })
+
+  useEffect(() => {
+    if (!user) return
+
+    if (!socketInstance) {
+      socketInstance = io('http://localhost:5000', {
+        withCredentials: true,
+        transports:      ['websocket', 'polling'],
+        reconnection:    true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 10,
+      })
+    }
+
+    const socket = socketInstance
+
+    if (user.clinicId) socket.emit('join:clinic', user.clinicId)
+
+    const patientId = localStorage.getItem('clinicos_patient_id')
+    if (user.role === 'patient' && patientId) {
+      socket.emit('join:patient', patientId)
+    }
+
+    const handlers = {
+      'queue:updated':   (d) => handlersRef.current.onQueueUpdate?.(d),
+      'queue:paused':    (d) => handlersRef.current.onQueuePaused?.(d),
+      'token:position':  (d) => handlersRef.current.onTokenPosition?.(d),
+      'bills:updated':   (d) => handlersRef.current.onBillsUpdated?.(d),
+      'token:served':    (d) => handlersRef.current.onTokenServed?.(d),
+      'bill:updated':    (d) => handlersRef.current.onBillUpdated?.(d),
+    }
+
+    Object.entries(handlers).forEach(([event, handler]) => {
+      socket.on(event, handler)
+    })
+
+    socket.on('connect', () => {
+      console.log('🔌 Socket connected')
+      if (user.clinicId) socket.emit('join:clinic', user.clinicId)
+      const pid = localStorage.getItem('clinicos_patient_id')
+      if (user.role === 'patient' && pid) socket.emit('join:patient', pid)
+    })
+
+    return () => {
+      Object.entries(handlers).forEach(([event, handler]) => {
+        socket.off(event, handler)
+      })
+    }
+  }, [user?.clinicId, user?.role])
+
+  const emit = useCallback((event, data) => {
+    socketInstance?.emit(event, data)
+  }, [])
+
+  const connected = socketInstance?.connected ?? false
+
+  return { emit, connected }
 }
 ```
 
 ---
 
-### 2. `server/src/routes/analytics.routes.js`
-
-```js
-const express = require('express')
-const router  = express.Router()
-const {
-  getOverview,
-  getRevenue,
-  getQueueStats,
-  getTopComplaints,
-  getDoctorStats,
-} = require('../controllers/analytics.controller')
-const { protect } = require('../middleware/auth.middleware')
-const { rbac }    = require('../middleware/rbac.middleware')
-
-router.use(protect, rbac(['admin']))
-
-router.get('/overview',    getOverview)
-router.get('/revenue',     getRevenue)
-router.get('/queue',       getQueueStats)
-router.get('/complaints',  getTopComplaints)
-router.get('/doctors',     getDoctorStats)
-
-module.exports = router
-```
-
----
-
-### 3. Mount in `server/index.js`
-
-```js
-app.use('/api/analytics', require('./src/routes/analytics.routes'))
-```
-
----
-
-### 4. Update `client/src/services/api.js`
-
-```js
-export const analyticsAPI = {
-  getOverview:   (params) => api.get('/analytics/overview',   { params }),
-  getRevenue:    (params) => api.get('/analytics/revenue',    { params }),
-  getQueue:      (params) => api.get('/analytics/queue',      { params }),
-  getComplaints: (params) => api.get('/analytics/complaints', { params }),
-  getDoctors:    (params) => api.get('/analytics/doctors',    { params }),
-}
-```
-
----
-
-## Frontend
-
-### 5. `client/src/pages/admin/Analytics.jsx`
+### Update `ReceptionDashboard.jsx` — listen for bill updates too
 
 ```jsx
-import { useState, useEffect, useCallback } from 'react'
-import { analyticsAPI, clinicAPI } from '../../services/api'
-import {
-  BarChart, Bar, LineChart, Line, AreaChart, Area,
-  BarChart as HBarChart, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Cell
-} from 'recharts'
-import {
-  TrendingUp, TrendingDown, Minus,
-  Users, IndianRupee, Clock, Activity,
-  AlertCircle, CheckCircle, MessageSquare,
-  Stethoscope, Download
-} from 'lucide-react'
+const { connected } = useSocket({
+  onQueueUpdate: (data) => {
+    setTokens(data.tokens)
+    setStats(data.stats)
+  },
+  onQueuePaused: (data) => {
+    setQueuePaused(data.paused)
+  },
+  // When any bill changes, refresh the token list to update billing badges
+  onBillUpdated: () => {
+    fetchTokens()
+  },
+})
+```
 
-// ── Design tokens for charts ──────────────────────────────────────
-const COLORS = {
-  crimson: '#C43055', teal: '#5AB09A', sky: '#70B8D8',
-  yellow:  '#F0C030', lavender: '#9080C0', peach: '#F0A078',
-  cream:   '#E0D4B5', muted: '#8A6070',
-}
+---
 
-const RANGE_OPTIONS = [
-  { id: 'today',  label: 'Today'    },
-  { id: '7days',  label: '7 Days'   },
-  { id: '30days', label: '30 Days'  },
-  { id: 'custom', label: 'Custom'   },
-]
+### Update `PatientDashboard.jsx` — listen for token and bill changes
 
-// ── Queue Health RAG ──────────────────────────────────────────────
-const RAG = {
-  green: { color: 'text-accent-teal',  bg: 'bg-accent-teal/10',  label: 'Healthy',  dot: 'bg-accent-teal'  },
-  amber: { color: 'text-amber-600',    bg: 'bg-accent-yellow/10',label: 'Warning',  dot: 'bg-accent-yellow'},
-  red:   { color: 'text-accent-coral', bg: 'bg-accent-coral/10', label: 'Critical', dot: 'bg-accent-coral' },
-}
+```jsx
+import { useSocket } from '../../hooks/useSocket'
 
-// ── Trend indicator ───────────────────────────────────────────────
-function Trend({ value }) {
-  if (value > 0)  return <span className="flex items-center gap-0.5 text-accent-teal text-xs font-bold"><TrendingUp size={12} />+{value}%</span>
-  if (value < 0)  return <span className="flex items-center gap-0.5 text-accent-coral text-xs font-bold"><TrendingDown size={12} />{value}%</span>
-  return <span className="flex items-center gap-0.5 text-text-muted text-xs"><Minus size={12} />0%</span>
-}
+export default function PatientDashboard() {
+  const { user }              = useAuth()
+  const navigate              = useNavigate()
+  const [data, setData]       = useState(null)
+  const [loading, setLoading] = useState(true)
 
-// ── KPI Card ──────────────────────────────────────────────────────
-function KPICard({ icon: Icon, label, value, sub, color, bg, trend, loading }) {
-  return (
-    <div className="card">
-      <div className={`w-10 h-10 ${bg} rounded-2xl flex items-center justify-center mb-3`}>
-        <Icon size={18} className={color} />
-      </div>
-      {loading ? (
-        <div className="h-8 w-16 bg-cream-200 rounded animate-pulse mb-1" />
-      ) : (
-        <div className="flex items-end gap-2">
-          <p className={`font-display font-bold text-3xl ${color}`}>{value}</p>
-          {trend !== undefined && <Trend value={trend} />}
-        </div>
-      )}
-      <p className="font-body text-xs text-text-muted mt-0.5">{label}</p>
-      {sub && <p className="font-body text-xs text-text-muted">{sub}</p>}
-    </div>
-  )
-}
-
-// ── Custom tooltip for charts ─────────────────────────────────────
-function ChartTooltip({ active, payload, label, prefix = '', suffix = '' }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="bg-white border border-cream-300 rounded-2xl px-3 py-2 shadow-card">
-      <p className="font-body text-xs text-text-muted mb-1">{label}</p>
-      {payload.map((entry, i) => (
-        <p key={i} className="font-body text-sm font-bold" style={{ color: entry.color }}>
-          {prefix}{typeof entry.value === 'number'
-            ? entry.value.toLocaleString('en-IN', { maximumFractionDigits: 0 })
-            : entry.value
-          }{suffix}
-        </p>
-      ))}
-    </div>
-  )
-}
-
-// ── CSV Export ────────────────────────────────────────────────────
-const exportCSV = (data, filename) => {
-  if (!data?.length) return
-  const keys = Object.keys(data[0])
-  const csv  = [
-    keys.join(','),
-    ...data.map(row => keys.map(k => `"${row[k] ?? ''}"`).join(',')),
-  ].join('\n')
-
-  const blob = new Blob([csv], { type: 'text/csv' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href     = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-// ── Section header ────────────────────────────────────────────────
-function SectionHeader({ title, onExport, exportData, exportFilename }) {
-  return (
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="font-display font-bold text-lg text-text-primary">{title}</h3>
-      {onExport && (
-        <button
-          onClick={() => exportCSV(exportData, exportFilename)}
-          className="flex items-center gap-1.5 font-body text-xs font-semibold text-text-muted hover:text-text-body transition-colors"
-        >
-          <Download size={13} /> Export CSV
-        </button>
-      )}
-    </div>
-  )
-}
-
-// ── Main Component ────────────────────────────────────────────────
-export default function Analytics() {
-  const [range, setRange]           = useState('7days')
-  const [customStart, setCustomStart] = useState('')
-  const [customEnd, setCustomEnd]   = useState('')
-  const [doctorId, setDoctorId]     = useState('')
-  const [doctors, setDoctors]       = useState([])
-
-  const [overview, setOverview]     = useState(null)
-  const [revenue, setRevenue]       = useState([])
-  const [queueStats, setQueueStats] = useState(null)
-  const [complaints, setComplaints] = useState([])
-  const [docStats, setDocStats]     = useState([])
-  const [loading, setLoading]       = useState(true)
-
-  // Fetch doctors for filter
-  useEffect(() => {
-    clinicAPI.getDoctors()
-      .then(res => setDoctors(res.data.data.doctors))
+  const fetchDashboard = useCallback(() => {
+    return patientPortalAPI.getDashboard()
+      .then(res => {
+        const d = res.data.data
+        setData(d)
+        if (d.patient?.id) {
+          localStorage.setItem('clinicos_patient_id', d.patient.id)
+        }
+      })
       .catch(console.error)
   }, [])
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true)
-    const params = { range, doctorId: doctorId || undefined }
-    if (range === 'custom' && customStart && customEnd) {
-      params.customStart = customStart
-      params.customEnd   = customEnd
-    }
+  useEffect(() => {
+    fetchDashboard().finally(() => setLoading(false))
+  }, [fetchDashboard])
 
+  // ── Real-time: update dashboard when token or bill changes ──────
+  useSocket({
+    onTokenPosition: (tokenData) => {
+      // Update active token in dashboard without full refetch
+      setData(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          activeToken: prev.activeToken
+            ? { ...prev.activeToken, ...tokenData }
+            : prev.activeToken,
+        }
+      })
+    },
+    onTokenServed: () => {
+      // Consultation complete — refresh dashboard
+      fetchDashboard()
+    },
+    onBillsUpdated: (data) => {
+      // New bill or bill paid — update recent bills
+      setData(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          recentBills: data.bills.slice(0, 3),
+        }
+      })
+    },
+  })
+
+  // ...rest of component
+}
+```
+
+---
+
+### Update `QueueTracker.jsx` — cleaner socket with reconnection
+
+Replace the socket setup with a cleaner version that uses `useSocket`:
+
+```jsx
+import { useSocket } from '../../hooks/useSocket'
+
+export default function QueueTracker() {
+  const navigate                    = useNavigate()
+  const [tokenData, setTokenData]   = useState(null)
+  const [loading, setLoading]       = useState(true)
+  const [lastUpdated, setLastUpdated] = useState(null)
+  const [leaving, setLeaving]       = useState(false)
+  const [notifyEnabled, setNotifyEnabled] = useState(true)
+
+  const fetchToken = useCallback(async () => {
     try {
-      const [ovRes, revRes, qRes, cmpRes, dRes] = await Promise.all([
-        analyticsAPI.getOverview(params),
-        analyticsAPI.getRevenue(params),
-        analyticsAPI.getQueue(params),
-        analyticsAPI.getComplaints(params),
-        analyticsAPI.getDoctors(params),
-      ])
-
-      setOverview(ovRes.data.data)
-      setRevenue(revRes.data.data.data || [])
-      setQueueStats(qRes.data.data)
-      setComplaints(cmpRes.data.data.topComplaints || [])
-      setDocStats(dRes.data.data.doctors || [])
+      const res = await patientPortalAPI.getActiveToken()
+      setTokenData(res.data.data.token)
+      setLastUpdated(new Date())
     } catch (err) {
-      console.error('Analytics fetch error:', err)
+      console.error(err)
     } finally {
       setLoading(false)
     }
-  }, [range, doctorId, customStart, customEnd])
+  }, [])
 
   useEffect(() => {
-    if (range !== 'custom' || (customStart && customEnd)) {
-      fetchAll()
-    }
-  }, [fetchAll])
+    fetchToken()
+    // Fallback poll every 30 seconds in case socket drops
+    const interval = setInterval(fetchToken, 30000)
+    return () => clearInterval(interval)
+  }, [fetchToken])
 
-  const kpis     = overview?.kpis    || {}
-  const rag      = RAG[kpis.queueHealth || 'green']
-  const trends   = overview?.trends  || {}
+  // ── Real-time updates via socket ──────────────────────────────
+  const { connected } = useSocket({
+    onTokenPosition: (data) => {
+      setTokenData(prev => {
+        if (!prev || prev.id !== data.tokenId) return prev
+        setLastUpdated(new Date())
+        return {
+          ...prev,
+          status:        data.status,
+          queuePosition: data.queuePosition,
+          estimatedWait: data.estimatedWait,
+          tokensAhead:   data.tokensAhead,
+          livePosition:  data.livePosition,
+        }
+      })
+    },
+    onTokenServed: (data) => {
+      setTokenData(prev => {
+        if (!prev || prev.id !== data.tokenId) return prev
+        return { ...prev, status: 'served' }
+      })
+      setLastUpdated(new Date())
+    },
+  })
 
-  // Format revenue data for chart
-  const revenueChartData = revenue.map(r => ({
-    date:    new Date(r.date).toLocaleDateString('en-IN', { day:'numeric', month:'short' }),
-    revenue: parseFloat(r.revenue) || 0,
-    bills:   parseInt(r.count)     || 0,
-  }))
-
-  // Format throughput data (show only clinic hours 8am-8pm)
-  const throughputData = (queueStats?.throughputByHour || [])
-    .filter(h => h.hour >= 7 && h.hour <= 20)
-    .map(h => ({
-      hour:  `${h.hour}:00`,
-      tokens: h.count,
-    }))
-
-  // Format avg wait data
-  const avgWaitData = (queueStats?.avgWaitByDay || []).map(d => ({
-    date:    new Date(d.date).toLocaleDateString('en-IN', { day:'numeric', month:'short' }),
-    avgWait: d.avgWait,
-    count:   d.count,
-  }))
-
-  return (
-    <div>
-      {/* Page header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="font-display font-bold text-3xl text-text-primary">Analytics</h1>
-          <p className="font-body text-text-muted mt-1">Clinic performance and revenue insights</p>
-        </div>
-
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Date range tabs */}
-          <div className="flex gap-1 bg-cream-100 p-1 rounded-2xl">
-            {RANGE_OPTIONS.map(opt => (
-              <button
-                key={opt.id}
-                onClick={() => setRange(opt.id)}
-                className={`px-3 py-1.5 rounded-xl font-body text-xs font-semibold transition-all
-                  ${range === opt.id
-                    ? 'bg-white text-crimson-700 shadow-card'
-                    : 'text-text-muted hover:text-text-body'
-                  }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Custom date range */}
-          {range === 'custom' && (
-            <>
-              <input
-                type="date"
-                value={customStart}
-                onChange={e => setCustomStart(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-cream-300 font-body text-xs focus:outline-none focus:border-crimson-400"
-              />
-              <span className="font-body text-xs text-text-muted">to</span>
-              <input
-                type="date"
-                value={customEnd}
-                onChange={e => setCustomEnd(e.target.value)}
-                className="px-3 py-1.5 rounded-xl border border-cream-300 font-body text-xs focus:outline-none focus:border-crimson-400"
-              />
-            </>
-          )}
-
-          {/* Doctor filter */}
-          {doctors.length > 0 && (
-            <select
-              value={doctorId}
-              onChange={e => setDoctorId(e.target.value)}
-              className="px-3 py-1.5 rounded-xl border border-cream-300 bg-white font-body text-xs focus:outline-none focus:border-crimson-400"
-            >
-              <option value="">All Doctors</option>
-              {doctors.map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-          )}
-        </div>
-      </div>
-
-      {/* ── KPI Cards ──────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <KPICard
-          icon={Users}
-          label="Patients Served"
-          value={kpis.patientsToday ?? '—'}
-          trend={trends.patients}
-          color="text-crimson-500"
-          bg="bg-crimson-100"
-          loading={loading}
-        />
-        <KPICard
-          icon={IndianRupee}
-          label="Revenue"
-          value={kpis.revenue ? `₹${Number(kpis.revenue).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '₹0'}
-          trend={trends.revenue}
-          color="text-accent-teal"
-          bg="bg-accent-teal/10"
-          loading={loading}
-        />
-        <KPICard
-          icon={Clock}
-          label="Avg Wait Time"
-          value={kpis.avgWaitMins !== undefined ? `${kpis.avgWaitMins}m` : '—'}
-          sub="per patient"
-          color="text-accent-sky"
-          bg="bg-accent-sky/10"
-          loading={loading}
-        />
-        <KPICard
-          icon={Activity}
-          label="No-show Rate"
-          value={kpis.noShowRate !== undefined ? `${kpis.noShowRate}%` : '—'}
-          sub={`${kpis.cancelledTokens || 0} cancelled`}
-          color="text-accent-peach"
-          bg="bg-accent-peach/10"
-          loading={loading}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-        <KPICard
-          icon={IndianRupee}
-          label="Paid Bills"
-          value={kpis.paidBills ?? '—'}
-          color="text-crimson-500"
-          bg="bg-crimson-100"
-          loading={loading}
-        />
-        <KPICard
-          icon={Users}
-          label="New Patients"
-          value={kpis.newPatients ?? '—'}
-          color="text-accent-lavender"
-          bg="bg-accent-lavender/10"
-          loading={loading}
-        />
-        <KPICard
-          icon={MessageSquare}
-          label="Messages Sent"
-          value={kpis.messagesSent ?? '—'}
-          sub={kpis.messagesFailed ? `${kpis.messagesFailed} failed` : undefined}
-          color="text-accent-teal"
-          bg="bg-accent-teal/10"
-          loading={loading}
-        />
-        {/* Queue Health RAG */}
-        <div className="card">
-          <div className={`w-10 h-10 ${rag.bg} rounded-2xl flex items-center justify-center mb-3`}>
-            <span className={`w-4 h-4 rounded-full ${rag.dot} ${kpis.queueHealth === 'green' ? 'animate-pulse' : ''}`} />
-          </div>
-          <div className="flex items-end gap-2">
-            <p className={`font-display font-bold text-xl ${rag.color}`}>{rag.label}</p>
-          </div>
-          <p className="font-body text-xs text-text-muted mt-0.5">Queue Health</p>
-          <p className="font-body text-xs text-text-muted">
-            {kpis.avgWaitMins > 45 ? 'Wait > 45min'
-              : kpis.avgWaitMins > 25 ? 'Wait > 25min'
-              : 'Wait within target'}
-          </p>
-        </div>
-      </div>
-
-      {/* ── Charts Grid ────────────────────────────────────────── */}
-      <div className="grid md:grid-cols-2 gap-5 mb-6">
-
-        {/* Revenue Bar Chart */}
-        <div className="card">
-          <SectionHeader
-            title="Revenue by Day"
-            exportData={revenueChartData}
-            exportFilename="revenue.csv"
-          />
-          {loading ? (
-            <div className="h-48 bg-cream-100 rounded-2xl animate-pulse" />
-          ) : revenueChartData.length === 0 ? (
-            <EmptyChart message="No revenue data for this period" />
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={revenueChartData} margin={{ top:5, right:5, bottom:5, left:5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.cream} />
-                <XAxis dataKey="date" tick={{ fontSize:11, fill:COLORS.muted }} tickLine={false} />
-                <YAxis tick={{ fontSize:11, fill:COLORS.muted }} tickLine={false} axisLine={false}
-                  tickFormatter={v => `₹${v >= 1000 ? (v/1000).toFixed(1)+'k' : v}`} />
-                <Tooltip content={<ChartTooltip prefix="₹" />} />
-                <Bar dataKey="revenue" fill={COLORS.crimson} radius={[6,6,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Avg Wait Line Chart */}
-        <div className="card">
-          <SectionHeader
-            title="Avg Wait Time (minutes)"
-            exportData={avgWaitData}
-            exportFilename="avg-wait.csv"
-          />
-          {loading ? (
-            <div className="h-48 bg-cream-100 rounded-2xl animate-pulse" />
-          ) : avgWaitData.length === 0 ? (
-            <EmptyChart message="No wait time data for this period" />
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={avgWaitData} margin={{ top:5, right:5, bottom:5, left:5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.cream} />
-                <XAxis dataKey="date" tick={{ fontSize:11, fill:COLORS.muted }} tickLine={false} />
-                <YAxis tick={{ fontSize:11, fill:COLORS.muted }} tickLine={false} axisLine={false}
-                  tickFormatter={v => `${v}m`} />
-                <Tooltip content={<ChartTooltip suffix=" min" />} />
-                <Line
-                  type="monotone" dataKey="avgWait"
-                  stroke={COLORS.teal} strokeWidth={2.5}
-                  dot={{ fill:COLORS.teal, strokeWidth:0, r:4 }}
-                  activeDot={{ r:6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Throughput Area Chart */}
-        <div className="card">
-          <SectionHeader
-            title="Patient Throughput by Hour"
-            exportData={throughputData}
-            exportFilename="throughput.csv"
-          />
-          {loading ? (
-            <div className="h-48 bg-cream-100 rounded-2xl animate-pulse" />
-          ) : throughputData.length === 0 ? (
-            <EmptyChart message="No throughput data for this period" />
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={throughputData} margin={{ top:5, right:5, bottom:5, left:5 }}>
-                <defs>
-                  <linearGradient id="tpGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor={COLORS.sky} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={COLORS.sky} stopOpacity={0.02}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.cream} />
-                <XAxis dataKey="hour" tick={{ fontSize:10, fill:COLORS.muted }} tickLine={false} interval={2} />
-                <YAxis tick={{ fontSize:11, fill:COLORS.muted }} tickLine={false} axisLine={false} />
-                <Tooltip content={<ChartTooltip suffix=" tokens" />} />
-                <Area
-                  type="monotone" dataKey="tokens"
-                  stroke={COLORS.sky} strokeWidth={2}
-                  fill="url(#tpGrad)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* Top Complaints Horizontal Bar */}
-        <div className="card">
-          <SectionHeader
-            title="Top Complaints / Tags"
-            exportData={complaints}
-            exportFilename="complaints.csv"
-          />
-          {loading ? (
-            <div className="h-48 bg-cream-100 rounded-2xl animate-pulse" />
-          ) : complaints.length === 0 ? (
-            <EmptyChart message="No complaint data for this period" />
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <HBarChart
-                data={[...complaints].reverse()}
-                layout="vertical"
-                margin={{ top:0, right:20, bottom:0, left:60 }}
-              >
-                <XAxis type="number" tick={{ fontSize:11, fill:COLORS.muted }} tickLine={false} axisLine={false} />
-                <YAxis
-                  type="category" dataKey="name"
-                  tick={{ fontSize:11, fill:COLORS.muted }}
-                  tickLine={false} width={56}
-                />
-                <Tooltip content={<ChartTooltip suffix=" cases" />} />
-                <Bar dataKey="count" radius={[0,4,4,0]}>
-                  {complaints.map((_, i) => (
-                    <Cell
-                      key={i}
-                      fill={[COLORS.crimson,COLORS.teal,COLORS.sky,COLORS.lavender,COLORS.peach,COLORS.yellow][i % 6]}
-                    />
-                  ))}
-                </Bar>
-              </HBarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-
-      {/* ── Doctor Utilisation Table ────────────────────────── */}
-      {docStats.length > 0 && (
-        <div className="card">
-          <SectionHeader
-            title="Doctor Utilisation"
-            exportData={docStats}
-            exportFilename="doctor-stats.csv"
-          />
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-cream-200">
-                  {['Doctor','Patients Served','Avg Wait','Revenue'].map(h => (
-                    <th key={h} className="text-left font-body text-xs font-bold uppercase tracking-wider text-text-muted pb-2 pr-4">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-cream-100">
-                {docStats.map(doc => (
-                  <tr key={doc.id} className="hover:bg-cream-50 transition-colors">
-                    <td className="py-3 pr-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 bg-crimson-100 rounded-xl flex items-center justify-center">
-                          <span className="font-display font-bold text-crimson-600 text-xs">
-                            {doc.name.charAt(0)}
-                          </span>
-                        </div>
-                        <span className="font-body font-semibold text-sm text-text-primary">{doc.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className="font-body text-sm text-text-body">{doc.patientsServed}</span>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className={`font-body text-sm font-semibold
-                        ${doc.avgWaitMins > 45 ? 'text-accent-coral'
-                          : doc.avgWaitMins > 25 ? 'text-amber-600'
-                          : 'text-accent-teal'}`}>
-                        {doc.avgWaitMins}m
-                      </span>
-                    </td>
-                    <td className="py-3">
-                      <span className="font-body text-sm text-text-body">
-                        ₹{Number(doc.revenue).toLocaleString('en-IN', { maximumFractionDigits:0 })}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function EmptyChart({ message }) {
-  return (
-    <div className="h-48 flex items-center justify-center">
-      <p className="font-body text-sm text-text-muted">{message}</p>
-    </div>
-  )
+  // ...rest of component — replace the lastUpdated footer with:
+  // {lastUpdated && (
+  //   <p className="font-body text-xs text-text-muted text-center">
+  //     <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${connected ? 'bg-accent-teal' : 'bg-accent-coral'}`} />
+  //     {connected ? 'Live' : 'Reconnecting...'} · Updated {lastUpdated.toLocaleTimeString(...)}
+  //   </p>
+  // )}
 }
 ```
 
 ---
 
-### 6. Update `AdminLayout.jsx` — add Analytics to nav
+### Update `BillHistory.jsx` — live bill updates
 
 ```jsx
-import { LayoutDashboard, Users, UserCheck, Settings, MessageSquare, BarChart2 } from 'lucide-react'
+import { useSocket } from '../../hooks/useSocket'
 
-const NAV_ITEMS = [
-  { to: '/admin',           label: 'Overview',      icon: LayoutDashboard, end: true },
-  { to: '/admin/analytics', label: 'Analytics',     icon: BarChart2 },
-  { to: '/admin/requests',  label: 'Join Requests', icon: UserCheck },
-  { to: '/admin/team',      label: 'Team',          icon: Users },
-  { to: '/admin/messages',  label: 'Messages',      icon: MessageSquare },
-  { to: '/admin/settings',  label: 'Settings',      icon: Settings },
-]
+export default function BillHistory() {
+  const [bills, setBills]     = useState([])
+  const [loading, setLoading] = useState(true)
+  // ...
+
+  const fetchBills = useCallback(() => {
+    return patientPortalAPI.getBills()
+      .then(res => setBills(res.data.data.bills))
+      .catch(console.error)
+  }, [])
+
+  useEffect(() => {
+    fetchBills().finally(() => setLoading(false))
+  }, [fetchBills])
+
+  // ── Real-time: update when bills change ───────────────────────
+  useSocket({
+    onBillsUpdated: (data) => {
+      setBills(data.bills)
+    },
+  })
+
+  // ...rest unchanged
+}
 ```
 
 ---
 
-### 7. Update `client/src/App.jsx`
+## Fix 5 — Auto-refresh Fallback for Every Dashboard
+
+Add a global auto-refresh as backup if socket drops. Create `client/src/hooks/useAutoRefresh.js`:
+
+```js
+import { useEffect } from 'react'
+
+// Silently refresh data every N seconds as socket fallback
+// fetchFn should be a stable callback (wrapped in useCallback)
+export function useAutoRefresh(fetchFn, intervalSeconds = 30) {
+  useEffect(() => {
+    const interval = setInterval(fetchFn, intervalSeconds * 1000)
+    return () => clearInterval(interval)
+  }, [fetchFn, intervalSeconds])
+}
+```
+
+Use it in all dashboards:
 
 ```jsx
-import Analytics from './pages/admin/Analytics'
+// In ReceptionDashboard.jsx
+import { useAutoRefresh } from '../../hooks/useAutoRefresh'
+useAutoRefresh(fetchTokens, 30)  // refresh every 30s as fallback
 
-// Add inside /admin nested routes:
-<Route path="analytics" element={<Analytics />} />
+// In DoctorQueue.jsx
+useAutoRefresh(fetchMyQueue, 30)
+
+// In PatientDashboard.jsx
+useAutoRefresh(fetchDashboard, 30)
+
+// In QueueTracker.jsx — already has 30s interval, keep it
 ```
 
 ---
 
-## Restart and Test
+## Restart and Full Test
 
 ```bash
 cd server && npm run dev
@@ -1091,37 +698,33 @@ cd client && npm run dev
 
 ---
 
-## Test Checklist — Full F7 per PRD
+## Complete Sync Test Checklist
 
-**KPI Cards:**
-- [ ] Patients Served count updates based on date range
-- [ ] Revenue shows ₹ total — only visible to Admin (staff route not exposed)
-- [ ] Avg Wait Time in minutes calculated correctly
-- [ ] No-show rate % shown
-- [ ] Queue Health RAG: green (< 25min), amber (25-45min), red (> 45min)
-- [ ] Messages Sent count matches message log
+Open these simultaneously in different tabs:
+- Tab 1: Staff at `/reception`
+- Tab 2: Doctor at `/doctor`
+- Tab 3: Patient at `/patient`
+- Tab 4: Patient at `/patient/queue`
+- Tab 5: Patient at `/patient/bills`
 
-**Charts (exact types from PRD):**
-- [ ] Revenue → bar chart by day ✓
-- [ ] Avg wait → line chart trend ✓
-- [ ] Throughput → area chart by hour ✓
-- [ ] Top complaints → horizontal bar top 10 ✓
+**Token flow:**
+- [ ] Staff issues token in Tab 1 → appears in Tab 2 (doctor queue) instantly
+- [ ] Staff issues token in Tab 1 → active token card appears in Tab 3 (patient dashboard) instantly
+- [ ] Patient opens Tab 4 (queue tracker) → shows correct position
 
-**Filters:**
-- [ ] Today / 7 Days / 30 Days switches update all charts simultaneously
-- [ ] Custom date range (start + end inputs appear)
-- [ ] Doctor filter narrows all data to that doctor
+**Consultation flow:**
+- [ ] Doctor clicks "Call Next" → Tab 1 updates token to "Now" instantly
+- [ ] Tab 4 (patient queue) shows "Your Turn 🎉" instantly
+- [ ] Doctor completes consultation → Tab 1 shows token as "Served" instantly
+- [ ] Tab 3 (patient dashboard) — active token disappears, recent visits updates
+- [ ] Tab 4 (patient queue) → "No Active Token"
 
-**Doctor Utilisation table:**
-- [ ] Each doctor shows patients served, avg wait, revenue
-- [ ] Wait time color coded (green/amber/red)
+**Billing flow:**
+- [ ] Staff clicks Bill on served token in Tab 1 → creates bill
+- [ ] Tab 5 (patient bills) shows new unpaid bill instantly
+- [ ] Staff marks bill as paid in Tab 1 → Tab 5 shows "Paid" badge instantly
+- [ ] OR: Patient pays via Tab 5 → Tab 1 shows "Billed ✓" badge on token row instantly
 
-**Export:**
-- [ ] "Export CSV" on each chart downloads a proper CSV file
-- [ ] CSV opens correctly in Excel/Sheets
-
-**Role check:**
-- [ ] Admin sees full analytics including revenue
-- [ ] Staff cannot access `/admin/analytics` (RBAC blocks it)
-
-Tell me when Phase 9 is working and we move to Phase 10 — Real-time with Socket.IO.
+**Fallback:**
+- [ ] Kill server → reconnection indicator shows in all dashboards
+- [ ] Restart server → within 30 seconds all dashboards auto-refresh with latest data

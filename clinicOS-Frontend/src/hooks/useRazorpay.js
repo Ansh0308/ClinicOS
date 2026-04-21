@@ -4,25 +4,33 @@
  */
 export const useRazorpay = () => {
   const openCheckout = (orderData, onSuccess, onFailure) => {
-    const options = {
-      key:         import.meta.env.VITE_RAZORPAY_KEY_ID,
-      amount:      orderData.amount,       // in paise — passed from backend
-      currency:    orderData.currency,
-      name:        'ClinicOS',
-      description: 'Medical Bill Payment',
-      order_id:    orderData.orderId,
+    if (!window.Razorpay) {
+      onFailure(new Error('Razorpay checkout failed to load. Refresh and try again.'))
+      return
+    }
 
-      // Prefill patient details
+    const keyId = orderData.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID
+    if (!keyId) {
+      onFailure(new Error('Online payments are not configured for this app.'))
+      return
+    }
+
+    const options = {
+      key: keyId,
+      amount: orderData.amount,
+      currency: orderData.currency,
+      name: 'ClinicOS',
+      description: 'Medical Bill Payment',
+      order_id: orderData.orderId,
+
       prefill: {
-        name:    orderData.patientName  || '',
+        name: orderData.patientName || '',
         contact: orderData.patientPhone || '',
       },
 
-      theme: { color: '#C43055' }, // ClinicOS crimson
+      theme: { color: '#C43055' },
 
       handler: (response) => {
-        // Called by Razorpay on successful payment
-        // response contains: razorpay_payment_id, razorpay_order_id, razorpay_signature
         onSuccess(response)
       },
 

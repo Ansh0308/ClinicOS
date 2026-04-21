@@ -1,6 +1,8 @@
 const { success, error } = require('../utils/apiResponse')
 const { Visit, Patient, User, Token } = require('../models')
 const { Op } = require('sequelize')
+const { emitQueueUpdate } = require('../services/queueEmit.service')
+const { recalculatePositions } = require('../services/token.service')
 
 // POST /api/visits
 const createVisit = async (req, res) => {
@@ -82,12 +84,18 @@ const completeVisit = async (req, res) => {
 
     await visit.update({ isComplete: true })
 
-    // Mark the linked token as served
     if (visit.tokenId) {
       await Token.update(
         { status: 'served', servedAt: new Date() },
         { where: { id: visit.tokenId } }
       )
+      await recalculatePositions(visit.clinicId)
+    }
+
+    try {
+      await emitQueueUpdate(visit.clinicId)
+    } catch (e) {
+      console.error('Visit socket emit failed:', e.message)
     }
 
     const { writeAudit } = require('../utils/audit')

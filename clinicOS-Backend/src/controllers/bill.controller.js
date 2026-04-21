@@ -1,8 +1,67 @@
 const { success, error } = require('../utils/apiResponse')
-const { Bill, Patient, Visit, Clinic } = require('../models')
+const { Bill, Patient, Visit, Clinic, Token, User } = require('../models')
 const { Op } = require('sequelize')
 const { sendMessage } = require('../services/message.service')
 const { writeAudit }  = require('../utils/audit')
+const { emitBillUpdate, emitQueueUpdate } = require('../services/queueEmit.service')
+const { emitToClinic } = require('../services/socket.service')
+
+const findPatientForUser = async (userId) => {
+  let patient = await Patient.findOne({ where: { userId } })
+  if (patient) return patient
+
+  const user = await User.findByPk(userId, { attributes: ['phone', 'email'] })
+  if (!user) return null
+
+  if (user.phone) {
+    patient = await Patient.findOne({ where: { phone: user.phone } })
+    if (patient) {
+      await patient.update({ userId })
+      return patient
+    }
+  }
+
+  if (user.email) {
+    patient = await Patient.findOne({ where: { email: user.email } })
+    if (patient) {
+      await patient.update({ userId })
+      return patient
+    }
+  }
+
+  return null
+}
+
+const getPaymentBill = async (req) => {
+  const include = [{ association: 'patient', attributes: ['id', 'name', 'phone'] }]
+
+  if (req.user?.role === 'patient') {
+    const patient = await findPatientForUser(req.userId)
+    if (!patient) return { bill: null, patient }
+
+    const bill = await Bill.findOne({
+      where: {
+        id: req.params.id,
+        patientId: patient.id,
+      },
+      include,
+    })
+
+    return { bill, patient }
+  }
+
+  const clinicId = req.user?.clinicId
+
+  const bill = await Bill.findOne({
+    where: {
+      id: req.params.id,
+      ...(clinicId ? { clinicId } : {}),
+    },
+    include,
+  })
+
+  return { bill, patient: null }
+}
 
 // ── POST /api/bills ───────────────────────────────────────────────
 const createBill = async (req, res) => {
@@ -43,6 +102,12 @@ const createBill = async (req, res) => {
       total,
       status: 'unpaid',
     })
+
+    try {
+      await emitBillUpdate(patientId, clinicId)
+    } catch (e) {
+      console.error('Bill socket emit failed:', e.message)
+    }
 
     return success(res, { bill }, 201)
   } catch (err) {
@@ -121,6 +186,39 @@ const markPaid = async (req, res) => {
       meta:     { amount: payAmount, paymentMethod },
     })
 
+    try {
+      await emitBillUpdate(bill.patientId, clinicId)
+
+      if (isFullyPaid) {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+
+        const tokens = await Token.findAll({
+          where: {
+            clinicId,
+            createdAt: { [Op.gte]: today },
+          },
+          include: [
+            { association: 'patient', attributes: ['id', 'name', 'phone'] },
+            { association: 'doctor',  attributes: ['id', 'name'] },
+          ],
+          order: [['status', 'ASC'], ['queuePosition', 'ASC'], ['createdAt', 'ASC']],
+        })
+
+        const servedToday = tokens.filter(t => t.status === 'served').length
+        const inQueue     = tokens.filter(t =>
+          ['waiting','now','paused','lab'].includes(t.status)
+        ).length
+
+        emitToClinic(clinicId, 'queue:updated', {
+          tokens,
+          stats: { inQueue, servedToday },
+        })
+      }
+    } catch (e) {
+      console.error('Payment socket emit failed:', e.message)
+    }
+
     return success(res, { bill, message: isFullyPaid ? 'Payment complete' : 'Partial payment recorded' })
   } catch (err) {
     console.error('markPaid error:', err.message)
@@ -177,15 +275,17 @@ const createRazorpayOrder = async (req, res) => {
   try {
     const { createOrder } = require('../services/razorpay.service')
 
-    const bill = await Bill.findOne({
-      where:   { id: req.params.id },
-      include: [{ association: 'patient', attributes: ['id', 'name', 'phone'] }],
-    })
+    const { bill, patient } = await getPaymentBill(req)
+
+    if (req.user?.role === 'patient' && !patient) {
+      return error(res, 'Patient profile not found', 404)
+    }
 
     if (!bill)                  return error(res, 'Bill not found', 404)
     if (bill.status === 'paid') return error(res, 'Bill is already paid', 400)
 
     const remainingAmount = Number(bill.total) - Number(bill.paidAmount || 0)
+    if (remainingAmount <= 0) return error(res, 'No remaining amount to pay for this bill', 400)
 
     const order = await createOrder({
       amount:  remainingAmount,
@@ -207,8 +307,8 @@ const createRazorpayOrder = async (req, res) => {
       patientPhone: bill.patient?.phone || '',
     })
   } catch (err) {
-    console.error('createRazorpayOrder error:', err?.error || err)
-    return error(res, 'Failed to create payment order', 500)
+    console.error('createRazorpayOrder error:', err.message)
+    return error(res, err.message || 'Failed to create payment order', err.statusCode || 500)
   }
 }
 
@@ -230,14 +330,17 @@ const verifyRazorpayPayment = async (req, res) => {
       return error(res, 'Payment verification failed — invalid signature', 400)
     }
 
-    const bill = await Bill.findOne({
-      where:   { id: req.params.id },
-      include: [{ association: 'patient', attributes: ['id', 'name'] }],
-    })
+    const { bill, patient } = await getPaymentBill(req)
+
+    if (req.user?.role === 'patient' && !patient) {
+      return error(res, 'Patient profile not found', 404)
+    }
 
     if (!bill) return error(res, 'Bill not found', 404)
+    if (bill.status === 'paid') return success(res, { message: 'Bill already marked as paid', bill })
 
     const remainingAmount = Number(bill.total) - Number(bill.paidAmount || 0)
+    if (remainingAmount <= 0) return error(res, 'No remaining amount to verify for this bill', 400)
     const newPaid = Number(bill.paidAmount || 0) + remainingAmount
 
     await bill.update({
@@ -278,7 +381,7 @@ const verifyRazorpayPayment = async (req, res) => {
     })
 
     writeAudit({
-      userId:   null,  // patient self-paid
+      userId:   null,
       clinicId: bill.clinicId,
       action:   'BILL_PAID_ONLINE',
       entity:   'Bill',
@@ -286,10 +389,41 @@ const verifyRazorpayPayment = async (req, res) => {
       meta:     { amount: bill.total, razorpay_payment_id },
     })
 
+    try {
+      await emitBillUpdate(bill.patientId, bill.clinicId)
+
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
+      const tokens = await Token.findAll({
+        where: {
+          clinicId: bill.clinicId,
+          createdAt: { [Op.gte]: today },
+        },
+        include: [
+          { association: 'patient', attributes: ['id', 'name', 'phone'] },
+          { association: 'doctor',  attributes: ['id', 'name'] },
+        ],
+        order: [['status', 'ASC'], ['queuePosition', 'ASC'], ['createdAt', 'ASC']],
+      })
+
+      const servedToday = tokens.filter(t => t.status === 'served').length
+      const inQueue     = tokens.filter(t =>
+        ['waiting','now','paused','lab'].includes(t.status)
+      ).length
+
+      emitToClinic(bill.clinicId, 'queue:updated', {
+        tokens,
+        stats: { inQueue, servedToday },
+      })
+    } catch (e) {
+      console.error('Razorpay payment socket emit failed:', e.message)
+    }
+
     return success(res, { message: 'Payment verified and recorded', bill })
   } catch (err) {
     console.error('verifyRazorpayPayment error:', err.message)
-    return error(res, 'Payment verification failed', 500)
+    return error(res, err.message || 'Payment verification failed', err.statusCode || 500)
   }
 }
 

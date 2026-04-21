@@ -13,7 +13,7 @@ router.post('/',              rbac(['staff', 'admin']),           createBill)
 router.get('/',               rbac(['staff', 'admin', 'doctor']), getPatientBills)
 router.get('/:id',            rbac(['staff', 'admin', 'doctor']), getBill)
 router.patch('/:id/payment',  rbac(['staff', 'admin']),           markPaid)
-router.post('/:id/razorpay-order',  createRazorpayOrder)
-router.post('/:id/razorpay-verify', verifyRazorpayPayment)
+router.post('/:id/razorpay-order',  rbac(['staff', 'admin']),     createRazorpayOrder)
+router.post('/:id/razorpay-verify', rbac(['staff', 'admin']),     verifyRazorpayPayment)
 
 module.exports = router

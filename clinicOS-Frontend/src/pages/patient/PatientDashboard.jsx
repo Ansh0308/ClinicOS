@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { patientPortalAPI } from '../../services/api'
+import { useSocket } from '../../hooks/useSocket'
+import { useAutoRefresh } from '../../hooks/useAutoRefresh'
 import {
   Activity, FileText, Receipt,
   Clock, ChevronRight, Stethoscope
@@ -13,12 +15,54 @@ export default function PatientDashboard() {
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    patientPortalAPI.getDashboard()
-      .then(res => setData(res.data.data))
+  const fetchDashboard = useCallback(() => {
+    return patientPortalAPI.getDashboard()
+      .then(res => {
+        const d = res.data.data
+        setData(d)
+        if (d.patient?.id) {
+          localStorage.setItem('clinicos_patient_id', d.patient.id)
+        }
+      })
       .catch(console.error)
-      .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    fetchDashboard().finally(() => setLoading(false))
+  }, [fetchDashboard])
+
+  useSocket({
+    onTokenNew: () => {
+      // A new token was just created for this patient — refresh the whole dashboard
+      // so the active token card appears immediately without any manual refresh.
+      fetchDashboard()
+    },
+    onTokenPosition: (tokenData) => {
+      setData(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          activeToken: prev.activeToken
+            ? { ...prev.activeToken, ...tokenData }
+            : prev.activeToken,
+        }
+      })
+    },
+    onTokenServed: () => {
+      fetchDashboard()
+    },
+    onBillsUpdated: (billData) => {
+      setData(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          recentBills: billData.bills.slice(0, 3),
+        }
+      })
+    },
+  })
+
+  useAutoRefresh(fetchDashboard, 30)
 
   if (loading) {
     return (

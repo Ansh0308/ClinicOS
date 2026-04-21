@@ -1,6 +1,8 @@
 const { success, error } = require('../utils/apiResponse')
 const { Patient, Token, Visit, Bill, User, Clinic } = require('../models')
 const { Op } = require('sequelize')
+const { emitQueueUpdate } = require('../services/queueEmit.service')
+const { emitBillUpdate } = require('../services/queueEmit.service')
 
 // ── Helper: find patient by userId, phone, or email ──────────────
 const findPatientForUser = async (userId) => {
@@ -238,6 +240,12 @@ const leaveQueue = async (req, res) => {
     const { recalculatePositions } = require('../services/token.service')
     await recalculatePositions(token.clinicId)
 
+    try {
+      await emitQueueUpdate(token.clinicId)
+    } catch (e) {
+      console.error('Leave queue socket emit failed:', e.message)
+    }
+
     return success(res, { message: 'You have left the queue' })
   } catch (err) {
     console.error('leaveQueue error:', err.message)
@@ -290,6 +298,39 @@ const initiatePayment = async (req, res) => {
       })
     } catch (msgErr) {
       console.error('Receipt message failed:', msgErr.message)
+    }
+
+    try {
+      await emitBillUpdate(patient.id, bill.clinicId)
+
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
+      const { Token } = require('../models')
+      const tokens = await Token.findAll({
+        where: {
+          clinicId: bill.clinicId,
+          createdAt: { [Op.gte]: today },
+        },
+        include: [
+          { association: 'patient', attributes: ['id', 'name', 'phone'] },
+          { association: 'doctor',  attributes: ['id', 'name'] },
+        ],
+        order: [['status', 'ASC'], ['queuePosition', 'ASC'], ['createdAt', 'ASC']],
+      })
+
+      const servedToday = tokens.filter(t => t.status === 'served').length
+      const inQueue     = tokens.filter(t =>
+        ['waiting','now','paused','lab'].includes(t.status)
+      ).length
+
+      const { emitToClinic } = require('../services/socket.service')
+      emitToClinic(bill.clinicId, 'queue:updated', {
+        tokens,
+        stats: { inQueue, servedToday },
+      })
+    } catch (e) {
+      console.error('Patient payment socket emit failed:', e.message)
     }
 
     return success(res, { message: 'Payment successful', bill })
