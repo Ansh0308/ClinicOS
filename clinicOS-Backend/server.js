@@ -13,8 +13,16 @@ const app    = express()
 const server = http.createServer(app)
 
 // ── Middleware ────────────────────────────────────────────────────────────────
+// Strip any accidental trailing slash from CLIENT_URL so CORS never mismatches
+// e.g. "https://clinicos.netlify.app/" and "https://clinicos.netlify.app" both work
+const allowedOrigin = (process.env.CLIENT_URL || '').replace(/\/$/, '')
+
 app.use(cors({
-  origin:      process.env.CLIENT_URL,
+  origin: (origin, callback) => {
+    // Allow server-to-server / health-check requests (no origin header) and the configured frontend
+    if (!origin || origin === allowedOrigin) return callback(null, true)
+    callback(new Error(`CORS: origin ${origin} not allowed`))
+  },
   credentials: true,
 }))
 app.use(express.json())
