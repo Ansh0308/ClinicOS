@@ -14,15 +14,6 @@ const sendOTP = async (req, res) => {
   if (!email) return error(res, 'Email is required', 400)
 
   try {
-    // If signup is sending this — check email not already taken
-    // This way user finds out BEFORE receiving an OTP email
-    if (checkDuplicate) {
-      const existing = await User.findOne({ where: { email } })
-      if (existing) {
-        return error(res, 'An account with this email already exists. Please sign in instead.', 409)
-      }
-    }
-
     const code = generateOTP()
     await saveOTP(email, code)
     await sendOTPEmail(email, code)
