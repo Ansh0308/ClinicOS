@@ -1,16 +1,14 @@
 const { OtpCode } = require('../models')
-const transporter = require('../config/mailer')
-require('dotenv').config()
+const { sendMail } = require('../config/mailer')
 
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
 const saveOTP = async (email, code) => {
-  // Delete any existing unused OTPs for this email first
   await OtpCode.destroy({ where: { email } })
 
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
 
   await OtpCode.create({ email, code, expiresAt })
 }
@@ -26,30 +24,22 @@ const verifyOTP = async (email, code) => {
 
   if (!otp) return false
 
-  // Check not expired
   if (new Date() > new Date(otp.expiresAt)) return false
 
-  // Mark as used so it can't be reused
   await otp.update({ used: true })
 
   return true
 }
 
 const sendOTPEmail = async (email, otp) => {
-  if (!process.env.MAIL_HOST || !process.env.MAIL_USER) {
-    console.log(`[OTP] Email not configured. OTP for ${email}: ${otp}`)
-    return
-  }
-
   try {
-    await transporter.sendMail({
-      from:    process.env.MAIL_FROM,
-      to:      email,
+    await sendMail({
+      to: email,
       subject: 'Your ClinicOS verification code',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
           <h2 style="color: #C43055; margin-bottom: 8px;">ClinicOS</h2>
-          <p style="color: #5C3070; margin-bottom: 24px;">
+          <p style="color: #5C3040; margin-bottom: 24px;">
             Use the code below to verify your email. It expires in <strong>10 minutes</strong>.
           </p>
           <div style="background: #FBEAF0; border: 2px solid #F2C5D4; border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 24px;">
@@ -68,7 +58,7 @@ const sendOTPEmail = async (email, otp) => {
     })
   } catch (err) {
     console.error('sendOTPEmail failed:', err.message)
-    console.log(`[OTP Fallback] OTP for ${email}: ${otp}`)
+    throw err
   }
 }
 

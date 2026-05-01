@@ -1,12 +1,11 @@
-const transporter    = require('../config/mailer')
+const { sendMail } = require('../config/mailer')
 const { renderTemplate } = require('../config/messageTemplates')
 const { MessageLog, Patient } = require('../models')
 require('dotenv').config()
 
 // ── Send email ────────────────────────────────────────────────────
 const sendEmail = async (to, subject, body, attachments = []) => {
-  await transporter.sendMail({
-    from:    process.env.MAIL_FROM,
+  await sendMail({
     to,
     subject,
     html: `
@@ -28,7 +27,6 @@ const sendEmail = async (to, subject, body, attachments = []) => {
         </div>
       </div>
     `,
-    attachments,
   })
 }
 

@@ -3,9 +3,8 @@ const crypto  = require('crypto')
 const { success, error } = require('../utils/apiResponse')
 const { generateOTP, saveOTP, verifyOTP, sendOTPEmail } = require('../services/otp.service')
 const { registerUser, loginUser } = require('../services/auth.service')
+const { sendMail } = require('../config/mailer')
 const { User, Clinic } = require('../models')
-const transporter = require('../config/mailer')
-require('dotenv').config()
 
 // ── POST /api/auth/send-otp ───────────────────────────────────────────────────
 const sendOTP = async (req, res) => {
@@ -136,9 +135,8 @@ const forgotPassword = async (req, res) => {
     // Build the reset link pointing to your frontend
     const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`
 
-    await transporter.sendMail({
-      from:    process.env.MAIL_FROM,
-      to:      email,
+    await sendMail({
+      to: email,
       subject: 'Reset your ClinicOS password',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
