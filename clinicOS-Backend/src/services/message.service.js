@@ -8,6 +8,7 @@ const sendEmail = async (to, subject, body, attachments = []) => {
   await sendMail({
     to,
     subject,
+    attachments,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
         <div style="background: linear-gradient(160deg, #D95570 0%, #A02040 55%, #4E0E20 100%);

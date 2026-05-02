@@ -1,0 +1,114 @@
+{
+  "info": {
+    "name": "ClinicOS APIs",
+    "description": "Postman Collection for ClinicOS Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "liveUrl",
+      "value": "https://clinicos-2r7c.onrender.com",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "your_jwt_token_here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "1. Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{liveUrl}}/api/auth/send-otp", "host": [ "{{liveUrl}}" ], "path": [ "api", "auth", "send-otp" ] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"test@example.com\"\n}" }
+          }
+        },
+        {
+          "name": "2. Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{liveUrl}}/api/auth/verify-otp", "host": [ "{{liveUrl}}" ], "path": [ "api", "auth", "verify-otp" ] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"test@example.com\",\n  \"code\": \"123456\"\n}" }
+          }
+        },
+        {
+          "name": "3. Register",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{liveUrl}}/api/auth/register", "host": [ "{{liveUrl}}" ], "path": [ "api", "auth", "register" ] },
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\",\n  \"role\": \"patient\",\n  \"phone\": \"9876543210\"\n}" }
+          }
+        },
+        {
+          "name": "4. Login",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{liveUrl}}/api/auth/login", "host": [ "{{liveUrl}}" ], "path": [ "api", "auth", "login" ] },
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}" }
+          }
+        },
+        {
+          "name": "5. Get Me",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{liveUrl}}/api/auth/me", "host": [ "{{liveUrl}}" ], "path": [ "api", "auth", "me" ] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bills",
+      "item": [
+        {
+          "name": "Get All Bills",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{liveUrl}}/api/bills", "host": [ "{{liveUrl}}" ], "path": [ "api", "bills" ] }
+          }
+        },
+        {
+          "name": "Get Specific Bill",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" } ],
+            "url": { "raw": "{{liveUrl}}/api/bills/1", "host": [ "{{liveUrl}}" ], "path": [ "api", "bills", "1" ] }
+          }
+        },
+        {
+          "name": "Create Bill",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{liveUrl}}/api/bills", "host": [ "{{liveUrl}}" ], "path": [ "api", "bills" ] },
+            "body": { "mode": "raw", "raw": "{\n  \"patientId\": 1,\n  \"items\": [\n    { \"name\": \"Consultation\", \"quantity\": 1, \"unitPrice\": 500 }\n  ]\n}" }
+          }
+        },
+        {
+          "name": "Mark Bill Paid",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Authorization", "value": "Bearer {{authToken}}" }, { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{liveUrl}}/api/bills/1/payment", "host": [ "{{liveUrl}}" ], "path": [ "api", "bills", "1", "payment" ] },
+            "body": { "mode": "raw", "raw": "{\n  \"paymentMethod\": \"online\"\n}" }
+          }
+        }
+      ]
+    }
+  ]
+}
