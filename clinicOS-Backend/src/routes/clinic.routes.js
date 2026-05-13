@@ -12,6 +12,8 @@ const {
 } = require('../controllers/clinic.controller')
 const { protect }  = require('../middleware/auth.middleware')
 const { rbac }     = require('../middleware/rbac.middleware')
+const { getAuditLogs } = require('../controllers/audit.controller')
+const { getIntegrations, updateIntegrations } = require('../controllers/clinic.controller')
 
 // ── Staff + Admin accessible ──────────────────────────────────────
 // Doctors list — needed by reception to assign tokens
@@ -27,5 +29,8 @@ router.get('/team',                 getTeam)
 router.patch('/team/:id',           updateMember)
 router.get('/clinic',               getClinicDetails)
 router.patch('/clinic',             updateClinicDetails)
+router.get('/audit-logs',           getAuditLogs)
+router.get('/integrations',         getIntegrations)
+router.patch('/integrations',       updateIntegrations)
 
 module.exports = router

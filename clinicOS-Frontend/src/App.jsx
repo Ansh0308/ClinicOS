@@ -10,8 +10,10 @@ import JoinRequests     from './pages/admin/JoinRequests'
 import TeamManagement   from './pages/admin/TeamManagement'
 import ClinicSettings   from './pages/admin/ClinicSettings'
 import MessageLogs      from './pages/admin/MessageLogs'
+import AuditLogs        from './pages/admin/AuditLogs'
 import ReceptionDashboard from './pages/reception/ReceptionDashboard'
 import BillingScreen      from './pages/reception/BillingScreen'
+import PatientDetail      from './pages/reception/PatientDetail'
 import DoctorLayout       from './layouts/DoctorLayout'
 import DoctorQueue       from './pages/doctor/DoctorQueue'
 import ConsultationForm  from './pages/doctor/ConsultationForm'
@@ -100,6 +102,11 @@ function AppContent() {
             <BillingScreen />
           </ProtectedRoute>
         } />
+        <Route path="/reception/patient/:id" element={
+          <ProtectedRoute allowedRoles={['staff', 'admin']}>
+            <PatientDetail />
+          </ProtectedRoute>
+        } />
         <Route path="/doctor" element={
           <ProtectedRoute allowedRoles={['doctor']}>
             <DoctorLayout />
@@ -119,6 +126,7 @@ function AppContent() {
   <Route path="requests" element={<JoinRequests />} />
   <Route path="team"     element={<TeamManagement />} />
   <Route path="messages" element={<MessageLogs />} />
+  <Route path="audit-logs" element={<AuditLogs />} />
   <Route path="settings" element={<ClinicSettings />} />
 </Route>
         <Route path="/patient" element={

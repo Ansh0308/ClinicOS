@@ -19,12 +19,16 @@ const AuditLog = sequelize.define('AuditLog', {
     type:      DataTypes.STRING(100), // e.g. 'USER_APPROVED', 'BILL_PAID'
     allowNull: false,
   },
-  entity: {
+  resourceType: {
     type:      DataTypes.STRING(50), // e.g. 'User', 'Bill', 'Token'
     allowNull: false,
   },
-  entityId: {
+  resourceId: {
     type:      DataTypes.UUID,
+    allowNull: true,
+  },
+  ipAddress: {
+    type:      DataTypes.STRING(45), // IPv6 compatible
     allowNull: true,
   },
   meta: {

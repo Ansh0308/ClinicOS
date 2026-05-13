@@ -8,7 +8,7 @@ import ReceptionLayout from '../../layouts/ReceptionLayout'
 import {
   Phone, UserPlus, Search, Users, Activity, Clock, X, ChevronDown,
   Bell, BellOff, Stethoscope, PauseCircle, PlayCircle, Pause, Play,
-  Zap, CheckCircle, IndianRupee, AlertTriangle, FlaskConical, ChevronRight, Plus, RotateCcw
+  Zap, CheckCircle, IndianRupee, AlertTriangle, FlaskConical, ChevronRight, Plus, RotateCcw, Eye
 } from 'lucide-react'
 
 const STATUS = {
@@ -480,6 +480,14 @@ export default function ReceptionDashboard() {
                     </button>
                   </div>
 
+
+                  {/* View Full Profile button */}
+                  <button
+                    onClick={() => navigate(`/reception/patient/${patient.id}`, { state: { patient } })}
+                    className="w-full py-2 rounded-xl border border-cream-300 bg-white text-text-body hover:bg-cream-100 font-body text-xs font-semibold flex items-center justify-center gap-2 transition-all mb-3"
+                  >
+                    <Eye size={14} /> View Full Profile <ChevronRight size={14} />
+                  </button>
                   {patient.hasActiveToken ? (
                     <div className="space-y-2">
                       <div className="bg-accent-yellow/10 border border-accent-yellow/30 rounded-xl p-3 text-center">
@@ -730,6 +738,14 @@ export default function ReceptionDashboard() {
                       Served{token.doctor && ` · Dr. ${token.doctor.name}`}
                     </p>
                   </div>
+                  {/* Profile link */}
+                  <button
+                    onClick={() => navigate(`/reception/patient/${token.patient?.id}`)}
+                    title="View Profile"
+                    className="w-7 h-7 rounded-xl bg-cream-100 hover:bg-crimson-100 flex items-center justify-center transition-colors flex-shrink-0"
+                  >
+                    <Eye size={13} className="text-crimson-600" />
+                  </button>
                   {/* Bill state badge */}
                   {token.billStatus === 'paid' ? (
                     <span className="flex items-center gap-1 font-body text-xs font-bold px-3 py-1.5 rounded-xl bg-accent-teal/10 text-accent-teal flex-shrink-0">

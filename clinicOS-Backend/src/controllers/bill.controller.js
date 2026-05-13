@@ -2,7 +2,7 @@ const { success, error } = require('../utils/apiResponse')
 const { Bill, Patient, Visit, Clinic, Token, User } = require('../models')
 const { Op } = require('sequelize')
 const { sendMessage } = require('../services/message.service')
-const { writeAudit }  = require('../utils/audit')
+const { logAudit, ACTIONS }  = require('../services/audit.service')
 const { emitBillUpdate, emitQueueUpdate } = require('../services/queueEmit.service')
 const { emitToClinic } = require('../services/socket.service')
 
@@ -109,6 +109,15 @@ const createBill = async (req, res) => {
       console.error('Bill socket emit failed:', e.message)
     }
 
+    logAudit({
+      userId: req.user.id,
+      action: ACTIONS.BILL_CREATED,
+      resourceType: 'bill',
+      resourceId: bill.id,
+      clinicId,
+      ip: req.ip
+    }).catch(() => {})
+
     return success(res, { bill }, 201)
   } catch (err) {
     console.error('createBill error:', err.message)
@@ -177,14 +186,14 @@ const markPaid = async (req, res) => {
       }
     }
 
-    writeAudit({
-      userId:   req.user.id,
+    logAudit({
+      userId: req.user.id,
+      action: isFullyPaid ? ACTIONS.BILL_PAID : 'BILL_PARTIAL_PAID',
+      resourceType: 'bill',
+      resourceId: bill.id,
       clinicId,
-      action:   isFullyPaid ? 'BILL_PAID' : 'BILL_PARTIAL_PAID',
-      entity:   'Bill',
-      entityId: bill.id,
-      meta:     { amount: payAmount, paymentMethod },
-    })
+      ip: req.ip
+    }).catch(() => {})
 
     try {
       await emitBillUpdate(bill.patientId, clinicId)
@@ -287,6 +296,15 @@ const createRazorpayOrder = async (req, res) => {
     const remainingAmount = Number(bill.total) - Number(bill.paidAmount || 0)
     if (remainingAmount <= 0) return error(res, 'No remaining amount to pay for this bill', 400)
 
+    const { ClinicSettings } = require('../models')
+    const settings = await ClinicSettings.findOne({ where: { clinicId: bill.clinicId } })
+    const keyId = settings?.razorpayKeyId
+    const keySecret = settings?.razorpayKeySecret
+
+    if (!keyId || !keySecret) {
+      return error(res, 'Online payments are not configured for this clinic', 503)
+    }
+
     const order = await createOrder({
       amount:  remainingAmount,
       receipt: `b_${bill.id.split('-')[0]}`, // Keep < 40 chars to avoid Razorpay error
@@ -295,6 +313,8 @@ const createRazorpayOrder = async (req, res) => {
         patientName: bill.patient?.name ? bill.patient.name.slice(0, 50) : 'Patient',
         clinicId:    bill.clinicId,
       },
+      keyId,
+      keySecret
     })
 
     return success(res, {
@@ -302,7 +322,7 @@ const createRazorpayOrder = async (req, res) => {
       amount:       order.amount,    // in paise
       currency:     order.currency,
       billId:       bill.id,
-      keyId:        process.env.RAZORPAY_KEY_ID,
+      keyId,
       patientName:  bill.patient?.name  || 'Patient',
       patientPhone: bill.patient?.phone || '',
     })
@@ -324,12 +344,6 @@ const verifyRazorpayPayment = async (req, res) => {
   try {
     const { verifySignature } = require('../services/razorpay.service')
 
-    // SECURITY: always verify signature before marking paid
-    const isValid = verifySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)
-    if (!isValid) {
-      return error(res, 'Payment verification failed — invalid signature', 400)
-    }
-
     const { bill, patient } = await getPaymentBill(req)
 
     if (req.user?.role === 'patient' && !patient) {
@@ -338,6 +352,16 @@ const verifyRazorpayPayment = async (req, res) => {
 
     if (!bill) return error(res, 'Bill not found', 404)
     if (bill.status === 'paid') return success(res, { message: 'Bill already marked as paid', bill })
+
+    const { ClinicSettings } = require('../models')
+    const settings = await ClinicSettings.findOne({ where: { clinicId: bill.clinicId } })
+    const keySecret = settings?.razorpayKeySecret
+
+    // SECURITY: always verify signature before marking paid
+    const isValid = verifySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature, keySecret)
+    if (!isValid) {
+      return error(res, 'Payment verification failed — invalid signature', 400)
+    }
 
     const remainingAmount = Number(bill.total) - Number(bill.paidAmount || 0)
     if (remainingAmount <= 0) return error(res, 'No remaining amount to verify for this bill', 400)
@@ -380,14 +404,14 @@ const verifyRazorpayPayment = async (req, res) => {
       }]
     })
 
-    writeAudit({
-      userId:   null,
+    logAudit({
+      userId: req.user ? req.user.id : null,
+      action: ACTIONS.BILL_PAID, // Could be BILL_PAID_ONLINE but we use ACTIONS.BILL_PAID
+      resourceType: 'bill',
+      resourceId: bill.id,
       clinicId: bill.clinicId,
-      action:   'BILL_PAID_ONLINE',
-      entity:   'Bill',
-      entityId: bill.id,
-      meta:     { amount: bill.total, razorpay_payment_id },
-    })
+      ip: req.ip
+    }).catch(() => {})
 
     try {
       await emitBillUpdate(bill.patientId, bill.clinicId)

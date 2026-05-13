@@ -8,6 +8,7 @@ const Visit       = require('./visit.model')
 const Bill        = require('./bill.model')
 const MessageLog  = require('./messageLog.model')
 const AuditLog    = require('./auditLog.model')
+const ClinicSettings = require('./clinicSettings.model')
 
 // ── Associations ──────────────────────────────────────────────────────────────
 // These tell Sequelize how tables are linked
@@ -16,6 +17,10 @@ const AuditLog    = require('./auditLog.model')
 // User ↔ Clinic
 User.belongsTo(Clinic, { foreignKey: 'clinicId', as: 'clinic' })
 Clinic.hasMany(User,   { foreignKey: 'clinicId', as: 'members' })
+
+// Clinic ↔ ClinicSettings
+Clinic.hasOne(ClinicSettings, { foreignKey: 'clinicId', as: 'settings' })
+ClinicSettings.belongsTo(Clinic, { foreignKey: 'clinicId', as: 'clinic' })
 
 // JoinRequest links User to Clinic
 JoinRequest.belongsTo(User,   { foreignKey: 'userId',     as: 'user' })
@@ -59,6 +64,7 @@ AuditLog.belongsTo(User,      { foreignKey: 'userId',    as: 'user' })
 module.exports = {
   User,
   Clinic,
+  ClinicSettings,
   OtpCode,
   JoinRequest,
   Patient,

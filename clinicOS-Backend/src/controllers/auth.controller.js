@@ -3,6 +3,7 @@ const crypto  = require('crypto')
 const { success, error } = require('../utils/apiResponse')
 const { generateOTP, saveOTP, verifyOTP, sendOTPEmail } = require('../services/otp.service')
 const { registerUser, loginUser } = require('../services/auth.service')
+const { logAudit, ACTIONS } = require('../services/audit.service')
 const { sendMail } = require('../config/mailer')
 const { User, Clinic } = require('../models')
 
@@ -35,6 +36,9 @@ const verifyOTPHandler = async (req, res) => {
     if (!valid) return error(res, 'Invalid or expired OTP', 400)
     return success(res, { message: 'OTP verified successfully' })
   } catch (err) {
+    if (err.message.includes('Too many failed attempts')) {
+      return error(res, err.message, 429)
+    }
     console.error('verifyOTP error:', err.message)
     return error(res, 'Verification failed', 500)
   }
@@ -56,6 +60,14 @@ const register = async (req, res) => {
       name, email, password, phone, role,
       clinicData, clinicCode, qualification, designation,
     })
+    logAudit({
+      userId: result.user.id,
+      action: ACTIONS.USER_REGISTER,
+      resourceType: 'user',
+      resourceId: result.user.id,
+      clinicId: result.user.clinicId,
+      ip: req.ip
+    }).catch(() => {})
     return success(res, result, 201)
   } catch (err) {
     console.error('register error:', err.message)
@@ -73,8 +85,19 @@ const login = async (req, res) => {
 
   try {
     const result = await loginUser(email, password)
+    logAudit({
+      userId: result.user.id,
+      action: ACTIONS.USER_LOGIN,
+      resourceType: 'user',
+      resourceId: result.user.id,
+      clinicId: result.user.clinicId,
+      ip: req.ip
+    }).catch(() => {})
     return success(res, result)
   } catch (err) {
+    if (err.message.includes('Account temporarily locked')) {
+      return error(res, err.message, 429)
+    }
     console.error('login error:', err.message)
     return error(res, err.message || 'Login failed', 401)
   }
@@ -160,6 +183,15 @@ const forgotPassword = async (req, res) => {
       `,
     })
 
+    logAudit({
+      userId: user ? user.id : null,
+      action: ACTIONS.PASSWORD_RESET_REQUESTED,
+      resourceType: 'user',
+      resourceId: user ? user.id : null,
+      clinicId: user ? user.clinicId : null,
+      ip: req.ip
+    }).catch(() => {})
+
     return success(res, { message: 'If this email exists, a reset link has been sent.' })
   } catch (err) {
     console.error('forgotPassword error:', err.message)
@@ -201,6 +233,15 @@ const resetPassword = async (req, res) => {
       resetToken:       null,
       resetTokenExpiry: null,
     })
+
+    logAudit({
+      userId: user.id,
+      action: ACTIONS.PASSWORD_RESET_DONE,
+      resourceType: 'user',
+      resourceId: user.id,
+      clinicId: user.clinicId,
+      ip: req.ip
+    }).catch(() => {})
 
     return success(res, { message: 'Password reset successfully. You can now sign in.' })
   } catch (err) {

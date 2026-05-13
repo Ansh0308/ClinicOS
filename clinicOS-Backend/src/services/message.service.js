@@ -4,11 +4,12 @@ const { MessageLog, Patient } = require('../models')
 require('dotenv').config()
 
 // ── Send email ────────────────────────────────────────────────────
-const sendEmail = async (to, subject, body, attachments = []) => {
+const sendEmail = async (to, subject, body, attachments = [], brevoApiKey = null) => {
   await sendMail({
     to,
     subject,
     attachments,
+    brevoApiKey,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
         <div style="background: linear-gradient(160deg, #D95570 0%, #A02040 55%, #4E0E20 100%);
@@ -131,6 +132,10 @@ const sendMessage = async ({
       return
     }
 
+    const { ClinicSettings } = require('../models')
+    const settings = await ClinicSettings.findOne({ where: { clinicId } })
+    const brevoApiKey = settings?.brevoApiKey || null
+
     // Use portal account email first, fall back to staff-entered email
     const recipientEmail = patient.user?.email || patient.email
 
@@ -144,7 +149,7 @@ const sendMessage = async ({
             console.log(`sendMessage: no email for patient ${patientId} — skipping email channel`)
             continue
           }
-          await sendEmail(recipientEmail, subject, body, attachments)
+          await sendEmail(recipientEmail, subject, body, attachments, brevoApiKey)
           await logMessage({ patientId, clinicId, channel: 'email', template: templateName, status: 'sent' })
           console.log(`✅ Email sent to ${recipientEmail} — template: ${templateName}`)
         }

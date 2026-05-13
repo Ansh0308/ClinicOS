@@ -1,6 +1,7 @@
 const express = require('express')
 const http    = require('http')
 const cors    = require('cors')
+const rateLimit = require('express-rate-limit')
 require('dotenv').config()
 
 const sequelize        = require('./src/config/database')
@@ -33,8 +34,45 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, data: { status: 'ok', time: new Date().toISOString() } })
 })
 
+// ── Limiters ───────────────────────────────────────────────────────────────────
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests from this IP, please try again after 15 minutes.' }
+})
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests from this IP, please try again after 15 minutes.' }
+})
+
+const otpLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many OTP requests. Please wait 1 hour before requesting another OTP.' }
+})
+
+const lookupLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests from this IP, please try again after 5 minutes.' }
+})
+
+app.use(globalLimiter)
+
 // ── Routes ───────────────────────────────────────────────────────────────────
-app.use('/api/auth',      require('./src/routes/auth.routes'))
+app.use('/api/auth/send-otp', otpLimiter)
+app.use('/api/auth', authLimiter, require('./src/routes/auth.routes'))
+app.use('/api/patients/lookup', lookupLimiter)
 app.use('/api/admin',     require('./src/routes/clinic.routes'))
 app.use('/api/patients',  require('./src/routes/patient.routes'))
 app.use('/api/patient',   require('./src/routes/patientPortal.routes'))

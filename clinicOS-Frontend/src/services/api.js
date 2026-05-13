@@ -42,6 +42,9 @@ export const adminAPI = {
   updateMember:      (id, action)=> api.patch(`/admin/team/${id}`, { action }),
   getClinic:         ()          => api.get('/admin/clinic'),
   updateClinic:      (data)      => api.patch('/admin/clinic', data),
+  getIntegrations:   ()          => api.get('/admin/integrations'),
+  updateIntegrations:(data)      => api.patch('/admin/integrations', data),
+  getAuditLogs:      (params)    => api.get('/admin/audit-logs', { params }),
 }
 
 export const clinicAPI = {
@@ -62,10 +65,11 @@ export const messageAPI = {
 }
 
 export const patientAPI = {
-  lookup:       (phone)         => api.post('/patients/lookup', { phone }),
-  create:       (data)          => api.post('/patients', data),
-  get:          (id)            => api.get(`/patients/${id}`),
-  updateOptIn:  (id, optInMsg)  => api.patch(`/patients/${id}/opt-in`, { optInMsg }),
+  lookup:         (phone)         => api.post('/patients/lookup', { phone }),
+  create:         (data)          => api.post('/patients', data),
+  get:            (id)            => api.get(`/patients/${id}`),
+  updateOptIn:    (id, optInMsg)  => api.patch(`/patients/${id}/opt-in`, { optInMsg }),
+  getStaffDetail: (id)            => api.get(`/patients/${id}/staff-detail`),
 }
 
 export const patientPortalAPI = {

@@ -3,6 +3,7 @@ const { Visit, Patient, User, Token } = require('../models')
 const { Op } = require('sequelize')
 const { emitQueueUpdate } = require('../services/queueEmit.service')
 const { recalculatePositions } = require('../services/token.service')
+const { logAudit, ACTIONS } = require('../services/audit.service')
 
 // POST /api/visits
 const createVisit = async (req, res) => {
@@ -27,6 +28,15 @@ const createVisit = async (req, res) => {
       clinicId,
       tokenId: tokenId || null,
     })
+
+    logAudit({
+      userId: req.user.id,
+      action: ACTIONS.VISIT_CREATED,
+      resourceType: 'visit',
+      resourceId: visit.id,
+      clinicId: req.user.clinicId,
+      ip: req.ip
+    }).catch(() => {})
 
     return success(res, { visit }, 201)
   } catch (err) {
@@ -98,15 +108,14 @@ const completeVisit = async (req, res) => {
       console.error('Visit socket emit failed:', e.message)
     }
 
-    const { writeAudit } = require('../utils/audit')
-    writeAudit({
-      userId:   req.user.id,
+    logAudit({
+      userId: req.user.id,
+      action: ACTIONS.VISIT_COMPLETED,
+      resourceType: 'visit',
+      resourceId: visit.id,
       clinicId: visit.clinicId,
-      action:   'VISIT_COMPLETED',
-      entity:   'Visit',
-      entityId: visit.id,
-      meta:     { patientId: visit.patientId },
-    })
+      ip: req.ip
+    }).catch(() => {})
 
     return success(res, { message: 'Visit completed' })
   } catch (err) {

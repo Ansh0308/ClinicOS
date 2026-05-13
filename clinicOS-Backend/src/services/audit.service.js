@@ -1,0 +1,46 @@
+const { AuditLog } = require('../models')
+
+const ACTIONS = {
+  USER_LOGIN: 'USER_LOGIN',
+  USER_LOGOUT: 'USER_LOGOUT',
+  USER_REGISTER: 'USER_REGISTER',
+  OTP_SENT: 'OTP_SENT',
+  OTP_VERIFIED: 'OTP_VERIFIED',
+  PASSWORD_RESET_REQUESTED: 'PASSWORD_RESET_REQUESTED',
+  PASSWORD_RESET_DONE: 'PASSWORD_RESET_DONE',
+  TOKEN_CREATED: 'TOKEN_CREATED',
+  TOKEN_STATUS_CHANGED: 'TOKEN_STATUS_CHANGED',
+  TOKEN_CANCELLED: 'TOKEN_CANCELLED',
+  TOKEN_EMERGENCY: 'TOKEN_EMERGENCY',
+  QUEUE_PAUSED: 'QUEUE_PAUSED',
+  QUEUE_RESUMED: 'QUEUE_RESUMED',
+  VISIT_CREATED: 'VISIT_CREATED',
+  VISIT_UPDATED: 'VISIT_UPDATED',
+  VISIT_COMPLETED: 'VISIT_COMPLETED',
+  BILL_CREATED: 'BILL_CREATED',
+  BILL_PAID: 'BILL_PAID',
+  JOIN_REQUEST_APPROVED: 'JOIN_REQUEST_APPROVED',
+  JOIN_REQUEST_REJECTED: 'JOIN_REQUEST_REJECTED',
+  MEMBER_SUSPENDED: 'MEMBER_SUSPENDED',
+  MEMBER_REACTIVATED: 'MEMBER_REACTIVATED',
+  CLINIC_UPDATED: 'CLINIC_UPDATED',
+  PATIENT_CREATED: 'PATIENT_CREATED',
+  PATIENT_OPTED_OUT: 'PATIENT_OPTED_OUT',
+}
+
+const logAudit = async ({ userId, action, resourceType, resourceId, clinicId, ip }) => {
+  try {
+    await AuditLog.create({
+      userId,
+      action,
+      resourceType: resourceType || 'System',
+      resourceId,
+      clinicId,
+      ipAddress: ip,
+    })
+  } catch (err) {
+    console.error('Audit log failed:', err.message)
+  }
+}
+
+module.exports = { logAudit, ACTIONS }

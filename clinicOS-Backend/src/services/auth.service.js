@@ -117,7 +117,20 @@ const registerUser = async ({ name, email, password, phone, role, clinicData, cl
   }
 }
 
+const loginAttempts = new Map()
+
+setInterval(() => {
+  loginAttempts.clear()
+}, 2 * 60 * 60 * 1000)
+
 const loginUser = async (email, password) => {
+  const attempt = loginAttempts.get(email) || { count: 0, lockedUntil: null }
+
+  if (attempt.lockedUntil && new Date() < attempt.lockedUntil) {
+    const minutesLeft = Math.ceil((attempt.lockedUntil - new Date()) / 60000)
+    throw new Error(`Account temporarily locked due to too many failed attempts. Try again in ${minutesLeft} minutes.`)
+  }
+
   // Find user with their clinic info
   const user = await User.findOne({
     where: { email },
@@ -130,8 +143,15 @@ const loginUser = async (email, password) => {
 
   const match = await bcrypt.compare(password, user.passwordHash)
   if (!match) {
+    attempt.count += 1
+    if (attempt.count >= 5) {
+      attempt.lockedUntil = new Date(Date.now() + 15 * 60 * 1000)
+    }
+    loginAttempts.set(email, attempt)
     throw new Error('Invalid email or password')
   }
+
+  loginAttempts.delete(email)
 
   const token = generateToken(user.id)
 

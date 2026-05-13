@@ -1,730 +1,398 @@
-The root cause is clear — socket emissions are missing from several controllers. Let me trace every event that needs real-time sync and fix all of them at once.
 
----
 
-## All Events That Need Real-time Sync
+## Task 1 — Rate Limiting (F25)
 
 ```
-Staff issues token        → queue updates (staff + doctor + patient dashboard)
-Staff changes token status → same
-Doctor completes consult  → token marked served (staff + patient)
-Staff creates bill        → patient bills list updates
-Patient or staff pays bill → patient bills list + staff "Completed Today" updates
-Queue pause/resume        → all dashboards
-```
+Install express-rate-limit in the server project.
 
-Right now only `token.controller.js` has emissions. The **visit controller** and **bill controller** have zero socket calls.
+Add rate limiting middleware to server/index.js with the following rules:
 
----
+1. Global limiter: 200 requests per 15 minutes per IP on all routes.
 
-## Fix 1 — `server/src/controllers/visit.controller.js`
+2. Auth limiter (stricter): 10 requests per 15 minutes per IP, applied 
+   only to all /api/auth/* routes. Error message: "Too many requests from 
+   this IP, please try again after 15 minutes."
 
-Add socket emission when consultation is completed:
+3. OTP limiter (strictest): 5 requests per 60 minutes per IP, applied 
+   only to POST /api/auth/send-otp. Error message: "Too many OTP requests. 
+   Please wait 1 hour before requesting another OTP."
 
-```js
-const { emitToClinic, emitToPatient } = require('../services/socket.service')
-const { recalculatePositions }         = require('../services/token.service')
+4. Lookup limiter: 30 requests per 5 minutes per IP, applied only to 
+   POST /api/patients/lookup.
 
-// At the top of the file, add this helper
-// (same as in token.controller — we'll refactor to shared later)
-const buildAndEmitQueue = async (clinicId) => {
-  const { Token } = require('../models')
-  const { Op }    = require('sequelize')
+All limiters should return JSON in the standard API response format:
+{ success: false, error: "message" } with HTTP status 429.
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  const tokens = await Token.findAll({
-    where: {
-      clinicId,
-      createdAt: { [Op.gte]: today },
-    },
-    include: [
-      { association: 'patient', attributes: ['id', 'name', 'phone'] },
-      { association: 'doctor',  attributes: ['id', 'name'] },
-    ],
-    order: [
-      ['status', 'ASC'],
-      ['queuePosition', 'ASC'],
-      ['createdAt', 'ASC'],
-    ],
-  })
-
-  const servedToday = tokens.filter(t => t.status === 'served').length
-  const inQueue     = tokens.filter(t =>
-    ['waiting','now','paused','lab'].includes(t.status)
-  ).length
-
-  // Broadcast full queue to clinic staff and doctors
-  emitToClinic(clinicId, 'queue:updated', {
-    tokens,
-    stats: { inQueue, servedToday },
-  })
-
-  // Send private position update to each waiting patient
-  for (const token of tokens) {
-    if (['waiting','now','paused','lab'].includes(token.status) && token.patientId) {
-      const tokensAhead = tokens.filter(t =>
-        t.status === 'waiting' &&
-        (t.queuePosition || 0) < (token.queuePosition || 0)
-      ).length
-
-      emitToPatient(token.patientId, 'token:position', {
-        tokenId:       token.id,
-        tokenNumber:   token.tokenNumber,
-        status:        token.status,
-        queuePosition: token.queuePosition,
-        estimatedWait: token.estimatedWait,
-        tokensAhead,
-        livePosition:  tokensAhead + (token.status === 'waiting' ? 1 : 0),
-      })
-    }
-
-    // Patient's token just got served — notify them
-    if (token.status === 'served' && token.patientId) {
-      emitToPatient(token.patientId, 'token:served', {
-        tokenId:     token.id,
-        tokenNumber: token.tokenNumber,
-        message:     'Your consultation is complete',
-      })
-    }
-  }
-}
-```
-
-Now update `completeVisit` to emit after completion:
-
-```js
-const completeVisit = async (req, res) => {
-  const { id } = req.params
-
-  try {
-    const visit = await Visit.findOne({
-      where: { id, doctorId: req.user.id },
-    })
-
-    if (!visit)           return error(res, 'Visit not found', 404)
-    if (visit.isComplete) return error(res, 'Already completed', 400)
-
-    await visit.update({ isComplete: true })
-
-    // Mark the linked token as served
-    if (visit.tokenId) {
-      await Token.update(
-        { status: 'served', servedAt: new Date() },
-        { where: { id: visit.tokenId } }
-      )
-
-      // Recalculate queue positions after serving
-      await recalculatePositions(visit.clinicId)
-    }
-
-    // ── Emit real-time update to all dashboards ───────────────────
-    await buildAndEmitQueue(visit.clinicId)
-
-    return success(res, { message: 'Visit completed' })
-  } catch (err) {
-    console.error('completeVisit error:', err.message)
-    return error(res, 'Failed to complete visit', 500)
-  }
-}
+Use the standardHeaders: true and legacyHeaders: false options.
+Mount all limiters before routes in index.js.
 ```
 
 ---
 
-## Fix 2 — `server/src/controllers/bill.controller.js`
+## Task 2 — Brute-force OTP Lockout (F24)
 
-Add socket emissions when bills are created and paid:
+```
+In server/src/services/otp.service.js, add brute-force protection for 
+OTP verification.
 
-```js
-const { emitToClinic, emitToPatient } = require('../services/socket.service')
+Create an in-memory Map called otpAttempts that tracks failed attempts 
+per email: Map<email, { count: number, lockedUntil: Date | null }>.
 
-// Helper: emit bill update to patient's private room
-const emitBillUpdate = async (patientId, clinicId) => {
-  const { Bill } = require('../models')
+Update the verifyOTP function with this logic:
+- Before checking the OTP, look up the email in otpAttempts.
+- If lockedUntil exists and is in the future, return false and throw an 
+  error: "Too many failed attempts. Try again after {time}."
+- If the OTP is WRONG, increment the attempt count for that email.
+- If count reaches 5, set lockedUntil to 30 minutes from now.
+- If the OTP is CORRECT, delete the entry from otpAttempts (reset counter).
 
-  const bills = await Bill.findAll({
-    where:   { patientId, clinicId },
-    include: [{ association: 'clinic', attributes: ['id', 'name'] }],
-    order:   [['createdAt', 'DESC']],
-  })
+Also add a cleanup: auto-delete entries from the Map every 2 hours to 
+prevent memory growth.
 
-  emitToPatient(patientId, 'bills:updated', { bills })
+In the verifyOTP controller (auth.controller.js), catch the lockout error 
+and return it as a 429 response with the standard error format.
 
-  // Also notify clinic staff that bill list changed
-  emitToClinic(clinicId, 'bill:updated', {
-    patientId,
-    message: 'Bill status changed',
-  })
-}
+Also add login brute-force protection in auth.service.js loginUser:
+- Track failed login attempts per email in a separate Map called 
+  loginAttempts.
+- After 5 failed password attempts, lock the account for 15 minutes.
+- On successful login, reset the counter.
+- Return a clear error message: "Account temporarily locked due to too 
+  many failed attempts. Try again in {X} minutes."
 ```
 
-In `createBill` — emit after bill creation:
+---
 
-```js
-const createBill = async (req, res) => {
-  // ... existing code ...
+## Task 3 — Audit Log Writes (F11)
 
-  const bill = await Bill.create({
-    patientId,
-    clinicId,
-    visitId:  visitId || null,
-    items:    processedItems,
-    subtotal,
-    tax,
-    total,
-    status:   'unpaid',
-  })
+```
+The AuditLog model already exists in server/src/models with fields: 
+id, userId, action, resourceType, resourceId, clinicId, timestamp, 
+and an ipAddress field (add this if not present as DataTypes.STRING).
 
-  // ── Real-time: notify patient a new bill exists ────────────────
-  try {
-    await emitBillUpdate(patientId, clinicId)
-  } catch (e) {
-    console.error('Bill socket emit failed:', e.message)
+Create a new file server/src/services/audit.service.js with a single 
+async function:
+
+  logAudit({ userId, action, resourceType, resourceId, clinicId, ip })
+
+This function should write to the AuditLog table. Wrap in try/catch — 
+audit failures must NEVER crash the main request. Just console.error 
+if logging fails.
+
+Actions to use (define these as constants in the same file):
+  ACTIONS = {
+    USER_LOGIN, USER_LOGOUT, USER_REGISTER,
+    OTP_SENT, OTP_VERIFIED, PASSWORD_RESET_REQUESTED, PASSWORD_RESET_DONE,
+    TOKEN_CREATED, TOKEN_STATUS_CHANGED, TOKEN_CANCELLED, TOKEN_EMERGENCY,
+    QUEUE_PAUSED, QUEUE_RESUMED,
+    VISIT_CREATED, VISIT_UPDATED, VISIT_COMPLETED,
+    BILL_CREATED, BILL_PAID,
+    JOIN_REQUEST_APPROVED, JOIN_REQUEST_REJECTED,
+    MEMBER_SUSPENDED, MEMBER_REACTIVATED,
+    CLINIC_UPDATED, PATIENT_CREATED, PATIENT_OPTED_OUT,
   }
 
-  return success(res, { bill }, 201)
-}
+Now add logAudit() calls (fire-and-forget — do NOT await, use .catch()) 
+in these controllers:
+
+auth.controller.js:
+  - login success → USER_LOGIN, resourceType: 'user', resourceId: user.id
+  - register success → USER_REGISTER
+  - forgotPassword → PASSWORD_RESET_REQUESTED
+  - resetPassword success → PASSWORD_RESET_DONE
+
+token.controller.js:
+  - createToken → TOKEN_CREATED, resourceId: token.id
+  - updateTokenStatus → TOKEN_STATUS_CHANGED, resourceId: token.id
+  - deleteToken → TOKEN_CANCELLED
+  - createEmergencyToken → TOKEN_EMERGENCY
+  - pauseQueue → QUEUE_PAUSED
+  - resumeQueue → QUEUE_RESUMED
+
+visit.controller.js:
+  - createVisit → VISIT_CREATED
+  - completeVisit → VISIT_COMPLETED
+
+bill.controller.js:
+  - createBill → BILL_CREATED
+  - markPaid → BILL_PAID
+
+clinic.controller.js:
+  - reviewRequest (approve) → JOIN_REQUEST_APPROVED
+  - reviewRequest (reject) → JOIN_REQUEST_REJECTED
+  - updateMember (suspend) → MEMBER_SUSPENDED
+  - updateMember (reactivate) → MEMBER_REACTIVATED
+  - updateClinicDetails → CLINIC_UPDATED
+
+patient.controller.js:
+  - createPatient → PATIENT_CREATED
+
+To get the IP address in each controller, pass req.ip. The userId comes 
+from req.userId (set by auth middleware). The clinicId comes from 
+req.user.clinicId.
 ```
 
-In `markPaid` — emit after payment:
+---
 
-```js
-const markPaid = async (req, res) => {
-  // ... existing code including sendMessage ...
+## Task 4 — Audit Log Admin Page (A-6)
 
-  await bill.update({
-    status:        'paid',
-    paymentMethod,
-    paidAt:        new Date(),
-  })
+```
+Backend:
 
-  // ── Real-time: notify patient bill is paid ─────────────────────
-  try {
-    await emitBillUpdate(bill.patientId, clinicId)
+Create server/src/controllers/audit.controller.js with one function:
+  getAuditLogs(req, res)
+  
+  Query the AuditLog table for the current clinicId.
+  Support these query params: action, resourceType, userId, 
+  startDate, endDate, limit (default 100, max 500), page (default 1).
+  Include: association 'user' with attributes ['id', 'name', 'email', 'role'].
+  Order by timestamp DESC.
+  Return: { logs, total, page, totalPages }
 
-    // Also refresh the queue board for staff
-    // (so "Billed" badge appears on served token row)
-    const { Token } = require('../models')
-    const { Op }    = require('sequelize')
-    const today     = new Date()
-    today.setHours(0, 0, 0, 0)
+Create server/src/routes/audit.routes.js:
+  GET /api/admin/audit → getAuditLogs
+  Protected by protect + rbac(['admin'])
+  Mount in index.js as app.use('/api/admin', require('./src/routes/audit.routes'))
+  (Note: clinic.routes already uses /api/admin — add audit routes to the 
+  SAME clinic.routes.js file, not a separate mount)
 
-    const tokens = await Token.findAll({
-      where: {
-        clinicId,
-        createdAt: { [Op.gte]: today },
-      },
-      include: [
-        { association: 'patient', attributes: ['id', 'name', 'phone'] },
-        { association: 'doctor',  attributes: ['id', 'name'] },
-      ],
-      order: [['status', 'ASC'], ['queuePosition', 'ASC'], ['createdAt', 'ASC']],
-    })
+Actually: add the route directly inside clinic.routes.js:
+  router.get('/audit', getAuditLogs) — with the existing admin rbac
 
-    const servedToday = tokens.filter(t => t.status === 'served').length
-    const inQueue     = tokens.filter(t =>
-      ['waiting','now','paused','lab'].includes(t.status)
-    ).length
-
-    emitToClinic(clinicId, 'queue:updated', {
-      tokens,
-      stats: { inQueue, servedToday },
-    })
-  } catch (e) {
-    console.error('Payment socket emit failed:', e.message)
+Add to client/src/services/api.js:
+  export const auditAPI = {
+    getLogs: (params) => api.get('/admin/audit', { params }),
   }
 
-  return success(res, { bill, message: 'Payment recorded' })
-}
-```
+Frontend:
 
-Also update `initiatePayment` in `patientPortal.controller.js` (patient self-pays):
+Create client/src/pages/admin/AuditLogs.jsx
 
-```js
-const initiatePayment = async (req, res) => {
-  // ... existing code ...
+The page should have:
+- Page title "Audit Logs" with subtitle "Complete action history for your clinic"
+- Filter bar with: Action dropdown (all the ACTIONS constants as options), 
+  Resource Type dropdown, Date range (start + end date pickers), 
+  a Search/Apply button, and a "Export CSV" button
+- A table with columns: Timestamp, User (name + role badge), 
+  Action (colour-coded badge), Resource Type, Resource ID (truncated UUID), 
+  IP Address
+- Pagination (Prev / Page X of Y / Next)
+- Loading skeleton (3 rows animate-pulse)
+- Empty state if no logs
+- Action badges should be colour coded:
+    Login/Register → accent-sky
+    Token actions → crimson-500
+    Visit actions → accent-teal
+    Bill actions → accent-yellow
+    Queue actions → accent-lavender
+    Admin actions → accent-peach
 
-  await bill.update({
-    status:        'paid',
-    paymentMethod,
-    paidAt:        new Date(),
-  })
+Add to AdminLayout.jsx NAV_ITEMS:
+  { to: '/admin/audit', label: 'Audit Logs', icon: Shield }
 
-  // ── Real-time: update both patient and clinic staff ───────────
-  try {
-    const { emitToPatient, emitToClinic } = require('../services/socket.service')
-    const { Bill } = require('../models')
-
-    const bills = await Bill.findAll({
-      where:   { patientId: patient.id, clinicId: bill.clinicId },
-      include: [{ association: 'clinic', attributes: ['id', 'name'] }],
-      order:   [['createdAt', 'DESC']],
-    })
-
-    emitToPatient(patient.id, 'bills:updated', { bills })
-    emitToClinic(bill.clinicId, 'bill:updated', {
-      patientId: patient.id,
-      message:   'Patient paid bill',
-    })
-  } catch (e) {
-    console.error('Payment socket emit failed:', e.message)
-  }
-
-  // trigger receipt email
-  // ...
-}
+Add to App.jsx inside /admin nested routes:
+  <Route path="audit" element={<AuditLogs />} />
 ```
 
 ---
 
-## Fix 3 — Shared `emitQueueUpdate` utility
+## Task 5 — Patient Detail Page for Staff (ST-2)
 
-The same queue-building logic is now in 3 files. Extract it to avoid drift:
-
-Create `server/src/services/queueEmit.service.js`:
-
-```js
-const { emitToClinic, emitToPatient } = require('./socket.service')
-
-const emitQueueUpdate = async (clinicId) => {
-  const { Token } = require('../models')
-  const { Op }    = require('sequelize')
-
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  try {
-    const tokens = await Token.findAll({
-      where: {
-        clinicId,
-        createdAt: { [Op.gte]: today },
-      },
-      include: [
-        { association: 'patient', attributes: ['id', 'name', 'phone'] },
-        { association: 'doctor',  attributes: ['id', 'name'] },
-      ],
-      order: [
-        ['status', 'ASC'],
-        ['queuePosition', 'ASC'],
-        ['createdAt', 'ASC'],
-      ],
-    })
-
-    const servedToday = tokens.filter(t => t.status === 'served').length
-    const inQueue     = tokens.filter(t =>
-      ['waiting','now','paused','lab'].includes(t.status)
-    ).length
-
-    // Emit to all clinic users (staff + doctors)
-    emitToClinic(clinicId, 'queue:updated', {
-      tokens,
-      stats: { inQueue, servedToday },
-    })
-
-    // Emit private position to each waiting patient
-    const waitingTokens = tokens.filter(t =>
-      ['waiting','now','paused','lab'].includes(t.status) && t.patientId
-    )
-
-    for (const token of waitingTokens) {
-      const tokensAhead = tokens.filter(t =>
-        t.status === 'waiting' &&
-        (t.queuePosition || 0) < (token.queuePosition || 0)
-      ).length
-
-      emitToPatient(token.patientId, 'token:position', {
-        tokenId:       token.id,
-        tokenNumber:   token.tokenNumber,
-        status:        token.status,
-        queuePosition: token.queuePosition,
-        estimatedWait: token.estimatedWait,
-        tokensAhead,
-        livePosition:  tokensAhead + (token.status === 'waiting' ? 1 : 0),
-      })
-    }
-
-    // Notify patients whose token was just served
-    const servedTokens = tokens.filter(t => t.status === 'served' && t.patientId)
-    for (const token of servedTokens) {
-      emitToPatient(token.patientId, 'token:served', {
-        tokenId:     token.id,
-        tokenNumber: token.tokenNumber,
-      })
-    }
-  } catch (err) {
-    console.error('emitQueueUpdate error:', err.message)
-  }
-}
-
-module.exports = { emitQueueUpdate }
 ```
+Backend:
 
-Now update all three controllers to use this shared function instead of duplicating the logic:
+In server/src/controllers/patient.controller.js add a new function:
+  getPatientDetail(req, res)
+  
+  Accepts patient ID from req.params.id.
+  Must verify patient belongs to req.user.clinicId.
+  Returns:
+    - Full patient record (id, name, phone, email, dob, gender, optInMsg, createdAt)
+    - visitCount (total completed visits)
+    - lastVisit (most recent visit date + complaint + doctor name)
+    - outstandingBalance (sum of total from unpaid bills)
+    - last5Visits (last 5 complete visits with: date, complaint, complaintTags, 
+      diagnosis, prescriptions, testsOrdered, followUpDate, doctor name)
+    - last5Bills (last 5 bills with: date, total, status, paymentMethod, items)
+    - activeToken (today's active token if any: tokenNumber, status, queuePosition)
 
-In `token.controller.js`:
-```js
-const { emitQueueUpdate } = require('../services/queueEmit.service')
-// Replace all the inline buildAndEmitQueue calls with:
-// await emitQueueUpdate(clinicId)
-```
+Add route in patient.routes.js:
+  GET /api/patients/:id/detail → getPatientDetail
+  rbac(['staff', 'admin', 'doctor'])
 
-In `visit.controller.js`:
-```js
-const { emitQueueUpdate } = require('../services/queueEmit.service')
-// Replace buildAndEmitQueue with:
-// await emitQueueUpdate(visit.clinicId)
+Add to patientAPI in api.js:
+  getDetail: (id) => api.get(`/patients/${id}/detail`)
+
+Frontend:
+
+Create client/src/pages/reception/PatientDetail.jsx
+
+This page is accessed at /staff/patient/:patientId.
+It receives patient data either from React Router location.state 
+(for fast navigation from reception) or fetches via API if no state.
+
+Layout — two column on desktop, stacked on mobile:
+
+LEFT COLUMN (1/3 width):
+  Patient card:
+    - Large avatar circle with first letter of name
+    - Name, phone, email
+    - Gender, DOB (calculate age), optInMsg toggle (calls PATCH /api/patients/:id/opt-in)
+    - Stats row: Total Visits | Outstanding Balance (red if > 0) | Member Since
+    - Active token card (if any): token number + status badge + queue position
+    - "Issue New Token" button → navigates to /reception with phone pre-filled
+
+RIGHT COLUMN (2/3 width):
+  Tabs: "Visit History" | "Bills"
+
+  Visit History tab:
+    - Accordion list of last5Visits
+    - Each item: date + doctor name in header
+    - Expanded: complaint, complaint tags, diagnosis, prescriptions table, 
+      tests ordered chips, follow-up date
+    - "View All Visits" link at bottom
+
+  Bills tab:
+    - List of last5Bills with: date, items summary, total, status badge
+    - If status is unpaid → show "Create Bill" button linking to /billing/:patientId
+    - "View All Bills" link at bottom
+
+Add to App.jsx:
+  import PatientDetail from './pages/reception/PatientDetail'
+  
+  <Route path="/staff/patient/:patientId" element={
+    <ProtectedRoute allowedRoles={['staff', 'admin', 'doctor']}>
+      <PatientDetail />
+    </ProtectedRoute>
+  } />
+
+In ReceptionDashboard.jsx — update the patient found card to add a 
+"View Full Profile" button alongside Issue Token. It should navigate to 
+/staff/patient/:patientId passing the patient object as location.state.
+
+Also in the Completed Today section — add a small "Profile" icon button 
+on each served token row that links to /staff/patient/:token.patient.id.
 ```
 
 ---
 
-## Fix 4 — Frontend: listen for all socket events
+## Task 6 — Admin Integrations Settings (A-5)
 
-### Update `useSocket.js`
-
-Add `onBillsUpdated` and `onTokenServed` handlers:
-
-```js
-export function useSocket({
-  onQueueUpdate,
-  onQueuePaused,
-  onTokenPosition,
-  onBillsUpdated,   // ← new
-  onTokenServed,    // ← new
-  onBillUpdated,    // ← new (for staff — bill status changed)
-} = {}) {
-  const { user }    = useAuth()
-  const handlersRef = useRef({
-    onQueueUpdate, onQueuePaused, onTokenPosition,
-    onBillsUpdated, onTokenServed, onBillUpdated,
-  })
-
-  useEffect(() => {
-    handlersRef.current = {
-      onQueueUpdate, onQueuePaused, onTokenPosition,
-      onBillsUpdated, onTokenServed, onBillUpdated,
-    }
-  })
-
-  useEffect(() => {
-    if (!user) return
-
-    if (!socketInstance) {
-      socketInstance = io('http://localhost:5000', {
-        withCredentials: true,
-        transports:      ['websocket', 'polling'],
-        reconnection:    true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: 10,
-      })
-    }
-
-    const socket = socketInstance
-
-    if (user.clinicId) socket.emit('join:clinic', user.clinicId)
-
-    const patientId = localStorage.getItem('clinicos_patient_id')
-    if (user.role === 'patient' && patientId) {
-      socket.emit('join:patient', patientId)
-    }
-
-    const handlers = {
-      'queue:updated':   (d) => handlersRef.current.onQueueUpdate?.(d),
-      'queue:paused':    (d) => handlersRef.current.onQueuePaused?.(d),
-      'token:position':  (d) => handlersRef.current.onTokenPosition?.(d),
-      'bills:updated':   (d) => handlersRef.current.onBillsUpdated?.(d),
-      'token:served':    (d) => handlersRef.current.onTokenServed?.(d),
-      'bill:updated':    (d) => handlersRef.current.onBillUpdated?.(d),
-    }
-
-    Object.entries(handlers).forEach(([event, handler]) => {
-      socket.on(event, handler)
-    })
-
-    socket.on('connect', () => {
-      console.log('🔌 Socket connected')
-      if (user.clinicId) socket.emit('join:clinic', user.clinicId)
-      const pid = localStorage.getItem('clinicos_patient_id')
-      if (user.role === 'patient' && pid) socket.emit('join:patient', pid)
-    })
-
-    return () => {
-      Object.entries(handlers).forEach(([event, handler]) => {
-        socket.off(event, handler)
-      })
-    }
-  }, [user?.clinicId, user?.role])
-
-  const emit = useCallback((event, data) => {
-    socketInstance?.emit(event, data)
-  }, [])
-
-  const connected = socketInstance?.connected ?? false
-
-  return { emit, connected }
-}
 ```
+The goal is to move all third-party API keys OUT of .env hardcoding and 
+into a database table that admin can edit via the UI.
 
----
+Backend:
 
-### Update `ReceptionDashboard.jsx` — listen for bill updates too
+Create a new Sequelize model server/src/models/clinicSettings.model.js:
+  Fields: id (UUID), clinicId (UUID), settingKey (STRING), 
+  settingValue (TEXT, allowNull), isSecret (BOOLEAN default false),
+  updatedAt (auto)
+  Unique constraint on [clinicId, settingKey]
+  tableName: 'clinic_settings'
 
-```jsx
-const { connected } = useSocket({
-  onQueueUpdate: (data) => {
-    setTokens(data.tokens)
-    setStats(data.stats)
-  },
-  onQueuePaused: (data) => {
-    setQueuePaused(data.paused)
-  },
-  // When any bill changes, refresh the token list to update billing badges
-  onBillUpdated: () => {
-    fetchTokens()
-  },
-})
-```
+The settingKeys to support:
+  whatsapp_api_key, whatsapp_phone_id,
+  msg91_api_key, msg91_sender_id, msg91_template_id,
+  smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from,
+  razorpay_key_id, razorpay_key_secret,
+  gst_rate (default "18"), 
+  clinic_timezone (default "Asia/Kolkata"),
+  token_prefix (default "T"),
+  working_hours_start (default "09:00"),
+  working_hours_end (default "20:00"),
+  avg_consult_mins (default "10")
 
----
+Add to models/index.js:
+  const ClinicSettings = require('./clinicSettings.model')
+  Clinic.hasMany(ClinicSettings, { foreignKey: 'clinicId', as: 'settings' })
 
-### Update `PatientDashboard.jsx` — listen for token and bill changes
+Create server/src/controllers/settings.controller.js:
 
-```jsx
-import { useSocket } from '../../hooks/useSocket'
+  getSettings(req, res):
+    Fetch all settings for clinicId.
+    For rows where isSecret=true, return value as "••••••••" if set, 
+    or empty string if not set. Never return actual secret values.
+    Also return .env fallback values for keys not yet in DB 
+    (so the form shows current config).
+    Return as a flat object: { whatsapp_api_key: "••••••••", gst_rate: "18", ... }
 
-export default function PatientDashboard() {
-  const { user }              = useAuth()
-  const navigate              = useNavigate()
-  const [data, setData]       = useState(null)
-  const [loading, setLoading] = useState(true)
+  updateSettings(req, res):
+    Accepts a flat object of key:value pairs.
+    For each key, upsert into clinic_settings.
+    Mark these keys as isSecret=true: 
+      whatsapp_api_key, msg91_api_key, smtp_pass, razorpay_key_secret, 
+      razorpay_key_id, smtp_user.
+    After saving, update the in-memory config so message.service.js uses 
+    the new values immediately (without server restart).
+    
+    Create a helper getClinicSetting(clinicId, key) that:
+      1. Checks clinic_settings table first
+      2. Falls back to process.env value
+    
+    Update message.service.js to use getClinicSetting(clinicId, key) 
+    instead of process.env directly for all API keys.
 
-  const fetchDashboard = useCallback(() => {
-    return patientPortalAPI.getDashboard()
-      .then(res => {
-        const d = res.data.data
-        setData(d)
-        if (d.patient?.id) {
-          localStorage.setItem('clinicos_patient_id', d.patient.id)
-        }
-      })
-      .catch(console.error)
-  }, [])
+Add routes in clinic.routes.js (admin only):
+  router.get('/settings/integrations', getSettings)
+  router.patch('/settings/integrations', updateSettings)
 
-  useEffect(() => {
-    fetchDashboard().finally(() => setLoading(false))
-  }, [fetchDashboard])
+Update client/src/services/api.js:
+  Add to adminAPI:
+    getIntegrations: () => api.get('/admin/settings/integrations'),
+    updateIntegrations: (data) => api.patch('/admin/settings/integrations', data),
 
-  // ── Real-time: update dashboard when token or bill changes ──────
-  useSocket({
-    onTokenPosition: (tokenData) => {
-      // Update active token in dashboard without full refetch
-      setData(prev => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          activeToken: prev.activeToken
-            ? { ...prev.activeToken, ...tokenData }
-            : prev.activeToken,
-        }
-      })
-    },
-    onTokenServed: () => {
-      // Consultation complete — refresh dashboard
-      fetchDashboard()
-    },
-    onBillsUpdated: (data) => {
-      // New bill or bill paid — update recent bills
-      setData(prev => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          recentBills: data.bills.slice(0, 3),
-        }
-      })
-    },
-  })
+Frontend:
 
-  // ...rest of component
-}
-```
+Create client/src/pages/admin/IntegrationSettings.jsx
 
----
+The page has tabbed sections (use button tabs, not browser tabs):
 
-### Update `QueueTracker.jsx` — cleaner socket with reconnection
+Tab 1 — Messaging:
+  WhatsApp Business API section:
+    - WhatsApp API Key (password input with show/hide toggle)
+    - WhatsApp Phone ID
+    - Status badge: "Connected" (green) if key is set, "Not configured" (grey)
+    - Help text: "Get these from Meta Business Suite → WhatsApp → API Setup"
+  
+  SMS — MSG91 section:
+    - API Key (secret), Sender ID, Template ID
+    - Status badge same pattern
+    - Help text: "Register at msg91.com to get these credentials"
+  
+  Email / SMTP section:
+    - SMTP Host, SMTP Port, SMTP User (secret), SMTP Password (secret), From Address
+    - "Test Email" button → POST /api/admin/settings/test-email 
+      (add this endpoint that sends a test email to the admin's own email)
+    - Status badge
 
-Replace the socket setup with a cleaner version that uses `useSocket`:
+Tab 2 — Payments:
+  Razorpay section:
+    - Key ID (secret), Key Secret (secret)
+    - Status badge
+    - Note: "Currently using mock payment. Add keys to enable live Razorpay."
+    - Help text: "Get from Razorpay Dashboard → Settings → API Keys"
 
-```jsx
-import { useSocket } from '../../hooks/useSocket'
+Tab 3 — Clinic Config:
+  - GST Rate (%) — number input, default 18
+  - Clinic Timezone — dropdown of Indian timezones
+  - Token Prefix — text input, default "T" (shows preview: T-1, T-2...)
+  - Working Hours Start / End — time pickers
+  - Average Consult Time (minutes) — number input, used for ETA calculation
 
-export default function QueueTracker() {
-  const navigate                    = useNavigate()
-  const [tokenData, setTokenData]   = useState(null)
-  const [loading, setLoading]       = useState(true)
-  const [lastUpdated, setLastUpdated] = useState(null)
-  const [leaving, setLeaving]       = useState(false)
-  const [notifyEnabled, setNotifyEnabled] = useState(true)
+Each tab has a "Save Changes" button that only saves that tab's settings.
+Show a "Saved ✓" success state for 3 seconds after save.
+Secret fields show "••••••••" as placeholder when a value is already set 
+but not being edited. Show a small "Click to change" hint.
 
-  const fetchToken = useCallback(async () => {
-    try {
-      const res = await patientPortalAPI.getActiveToken()
-      setTokenData(res.data.data.token)
-      setLastUpdated(new Date())
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+Replace the existing ClinicSettings.jsx in the admin dashboard 
+(the one with clinic name/address/phone) — KEEP that page as is but 
+rename it to "Clinic Profile" and update AdminLayout nav label accordingly. 
+The new IntegrationSettings page is separate.
 
-  useEffect(() => {
-    fetchToken()
-    // Fallback poll every 30 seconds in case socket drops
-    const interval = setInterval(fetchToken, 30000)
-    return () => clearInterval(interval)
-  }, [fetchToken])
+Add to AdminLayout.jsx NAV_ITEMS:
+  { to: '/admin/integrations', label: 'Integrations', icon: Settings2 }
 
-  // ── Real-time updates via socket ──────────────────────────────
-  const { connected } = useSocket({
-    onTokenPosition: (data) => {
-      setTokenData(prev => {
-        if (!prev || prev.id !== data.tokenId) return prev
-        setLastUpdated(new Date())
-        return {
-          ...prev,
-          status:        data.status,
-          queuePosition: data.queuePosition,
-          estimatedWait: data.estimatedWait,
-          tokensAhead:   data.tokensAhead,
-          livePosition:  data.livePosition,
-        }
-      })
-    },
-    onTokenServed: (data) => {
-      setTokenData(prev => {
-        if (!prev || prev.id !== data.tokenId) return prev
-        return { ...prev, status: 'served' }
-      })
-      setLastUpdated(new Date())
-    },
-  })
-
-  // ...rest of component — replace the lastUpdated footer with:
-  // {lastUpdated && (
-  //   <p className="font-body text-xs text-text-muted text-center">
-  //     <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${connected ? 'bg-accent-teal' : 'bg-accent-coral'}`} />
-  //     {connected ? 'Live' : 'Reconnecting...'} · Updated {lastUpdated.toLocaleTimeString(...)}
-  //   </p>
-  // )}
-}
-```
-
----
-
-### Update `BillHistory.jsx` — live bill updates
-
-```jsx
-import { useSocket } from '../../hooks/useSocket'
-
-export default function BillHistory() {
-  const [bills, setBills]     = useState([])
-  const [loading, setLoading] = useState(true)
-  // ...
-
-  const fetchBills = useCallback(() => {
-    return patientPortalAPI.getBills()
-      .then(res => setBills(res.data.data.bills))
-      .catch(console.error)
-  }, [])
-
-  useEffect(() => {
-    fetchBills().finally(() => setLoading(false))
-  }, [fetchBills])
-
-  // ── Real-time: update when bills change ───────────────────────
-  useSocket({
-    onBillsUpdated: (data) => {
-      setBills(data.bills)
-    },
-  })
-
-  // ...rest unchanged
-}
-```
-
----
-
-## Fix 5 — Auto-refresh Fallback for Every Dashboard
-
-Add a global auto-refresh as backup if socket drops. Create `client/src/hooks/useAutoRefresh.js`:
-
-```js
-import { useEffect } from 'react'
-
-// Silently refresh data every N seconds as socket fallback
-// fetchFn should be a stable callback (wrapped in useCallback)
-export function useAutoRefresh(fetchFn, intervalSeconds = 30) {
-  useEffect(() => {
-    const interval = setInterval(fetchFn, intervalSeconds * 1000)
-    return () => clearInterval(interval)
-  }, [fetchFn, intervalSeconds])
-}
-```
-
-Use it in all dashboards:
-
-```jsx
-// In ReceptionDashboard.jsx
-import { useAutoRefresh } from '../../hooks/useAutoRefresh'
-useAutoRefresh(fetchTokens, 30)  // refresh every 30s as fallback
-
-// In DoctorQueue.jsx
-useAutoRefresh(fetchMyQueue, 30)
-
-// In PatientDashboard.jsx
-useAutoRefresh(fetchDashboard, 30)
-
-// In QueueTracker.jsx — already has 30s interval, keep it
-```
-
----
-
-## Restart and Full Test
-
-```bash
-cd server && npm run dev
-cd client && npm run dev
-```
-
----
-
-## Complete Sync Test Checklist
-
-Open these simultaneously in different tabs:
-- Tab 1: Staff at `/reception`
-- Tab 2: Doctor at `/doctor`
-- Tab 3: Patient at `/patient`
-- Tab 4: Patient at `/patient/queue`
-- Tab 5: Patient at `/patient/bills`
-
-**Token flow:**
-- [ ] Staff issues token in Tab 1 → appears in Tab 2 (doctor queue) instantly
-- [ ] Staff issues token in Tab 1 → active token card appears in Tab 3 (patient dashboard) instantly
-- [ ] Patient opens Tab 4 (queue tracker) → shows correct position
-
-**Consultation flow:**
-- [ ] Doctor clicks "Call Next" → Tab 1 updates token to "Now" instantly
-- [ ] Tab 4 (patient queue) shows "Your Turn 🎉" instantly
-- [ ] Doctor completes consultation → Tab 1 shows token as "Served" instantly
-- [ ] Tab 3 (patient dashboard) — active token disappears, recent visits updates
-- [ ] Tab 4 (patient queue) → "No Active Token"
-
-**Billing flow:**
-- [ ] Staff clicks Bill on served token in Tab 1 → creates bill
-- [ ] Tab 5 (patient bills) shows new unpaid bill instantly
-- [ ] Staff marks bill as paid in Tab 1 → Tab 5 shows "Paid" badge instantly
-- [ ] OR: Patient pays via Tab 5 → Tab 1 shows "Billed ✓" badge on token row instantly
-
-**Fallback:**
-- [ ] Kill server → reconnection indicator shows in all dashboards
-- [ ] Restart server → within 30 seconds all dashboards auto-refresh with latest data
+Add to App.jsx inside /admin nested routes:
+  import IntegrationSettings from './pages/admin/IntegrationSettings'
+  <Route path="integrations" element={<IntegrationSettings />} />

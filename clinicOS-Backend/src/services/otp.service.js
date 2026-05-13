@@ -13,7 +13,20 @@ const saveOTP = async (email, code) => {
   await OtpCode.create({ email, code, expiresAt })
 }
 
+const otpAttempts = new Map()
+
+setInterval(() => {
+  otpAttempts.clear()
+}, 2 * 60 * 60 * 1000)
+
 const verifyOTP = async (email, code) => {
+  const attempt = otpAttempts.get(email) || { count: 0, lockedUntil: null }
+
+  if (attempt.lockedUntil && new Date() < attempt.lockedUntil) {
+    const minutesLeft = Math.ceil((attempt.lockedUntil - new Date()) / 60000)
+    throw new Error(`Too many failed attempts. Try again after ${minutesLeft} minutes.`)
+  }
+
   const otp = await OtpCode.findOne({
     where: {
       email,
@@ -22,11 +35,17 @@ const verifyOTP = async (email, code) => {
     },
   })
 
-  if (!otp) return false
-
-  if (new Date() > new Date(otp.expiresAt)) return false
+  if (!otp || new Date() > new Date(otp.expiresAt)) {
+    attempt.count += 1
+    if (attempt.count >= 5) {
+      attempt.lockedUntil = new Date(Date.now() + 30 * 60 * 1000)
+    }
+    otpAttempts.set(email, attempt)
+    return false
+  }
 
   await otp.update({ used: true })
+  otpAttempts.delete(email)
 
   return true
 }

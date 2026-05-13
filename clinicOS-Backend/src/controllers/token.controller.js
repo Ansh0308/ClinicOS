@@ -9,6 +9,7 @@ const {
 const { sendMessage } = require('../services/message.service')
 const { emitQueueUpdate, emitNewToken } = require('../services/queueEmit.service')
 const { saveUndoState, getUndoState, clearUndoState } = require('../services/undo.service')
+const { logAudit, ACTIONS } = require('../services/audit.service')
 
 // GET /api/tokens
 const getTokens = async (req, res) => {
@@ -149,6 +150,15 @@ const createToken = async (req, res) => {
     await emitQueueUpdate(clinicId)
     await emitNewToken(full.toJSON())   // notify the specific patient in real-time
 
+    logAudit({
+      userId: req.userId, // JWT middleware sets req.userId not req.user.id unless passport sets req.user. Wait, line 16 uses req.user.clinicId so req.user exists
+      action: ACTIONS.TOKEN_CREATED,
+      resourceType: 'token',
+      resourceId: token.id,
+      clinicId,
+      ip: req.ip
+    }).catch(() => {})
+
     return success(res, { token: full }, 201)
   } catch (err) {
     console.error('createToken error:', err.message)
@@ -215,6 +225,15 @@ const updateTokenStatus = async (req, res) => {
 
     await emitQueueUpdate(clinicId)
 
+    logAudit({
+      userId: req.user ? req.user.id : req.userId,
+      action: ACTIONS.TOKEN_STATUS_CHANGED,
+      resourceType: 'token',
+      resourceId: token.id,
+      clinicId,
+      ip: req.ip
+    }).catch(() => {})
+
     return success(res, { message: 'Token status updated', token })
   } catch (err) {
     console.error('updateTokenStatus error:', err.message)
@@ -233,6 +252,15 @@ const deleteToken = async (req, res) => {
     await token.update({ status: 'cancelled' })
     await recalculatePositions(clinicId)
     await emitQueueUpdate(clinicId)
+
+    logAudit({
+      userId: req.user ? req.user.id : req.userId,
+      action: ACTIONS.TOKEN_CANCELLED,
+      resourceType: 'token',
+      resourceId: token.id,
+      clinicId,
+      ip: req.ip
+    }).catch(() => {})
 
     return success(res, { message: 'Token cancelled' })
   } catch (err) {
@@ -271,6 +299,15 @@ const createEmergencyToken = async (req, res) => {
     })
 
     await emitQueueUpdate(clinicId)
+
+    logAudit({
+      userId: req.user ? req.user.id : req.userId,
+      action: ACTIONS.TOKEN_EMERGENCY,
+      resourceType: 'token',
+      resourceId: token.id,
+      clinicId,
+      ip: req.ip
+    }).catch(() => {})
 
     return success(res, { token }, 201)
   } catch (err) {
@@ -312,6 +349,15 @@ const pauseQueue = async (req, res) => {
 
     emitToClinic(clinicId, 'queue:paused', { paused: true })
 
+    logAudit({
+      userId: req.user ? req.user.id : req.userId,
+      action: ACTIONS.QUEUE_PAUSED,
+      resourceType: 'clinic',
+      resourceId: clinicId,
+      clinicId,
+      ip: req.ip
+    }).catch(() => {})
+
     return success(res, { message: 'Queue paused' })
   } catch (err) {
     return error(res, 'Failed to pause queue', 500)
@@ -351,6 +397,15 @@ const resumeQueue = async (req, res) => {
     })
 
     emitToClinic(clinicId, 'queue:paused', { paused: false })
+
+    logAudit({
+      userId: req.user ? req.user.id : req.userId,
+      action: ACTIONS.QUEUE_RESUMED,
+      resourceType: 'clinic',
+      resourceId: clinicId,
+      clinicId,
+      ip: req.ip
+    }).catch(() => {})
 
     return success(res, { message: 'Queue resumed' })
   } catch (err) {

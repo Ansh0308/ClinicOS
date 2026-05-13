@@ -1,6 +1,7 @@
 const { success, error } = require('../utils/apiResponse')
 const { Patient, Token, User } = require('../models')
 const { Op } = require('sequelize')
+const { logAudit, ACTIONS } = require('../services/audit.service')
 
 // ── Helper: build patient response object ─────────────────────────────────────
 const buildPatientResponse = async (patient, clinicId) => {
@@ -141,6 +142,15 @@ const createPatient = async (req, res) => {
       optInMsg: optInMsg !== false,
     })
 
+    logAudit({
+      userId: req.user.id,
+      action: ACTIONS.PATIENT_CREATED,
+      resourceType: 'patient',
+      resourceId: patient.id,
+      clinicId: req.user.clinicId,
+      ip: req.ip
+    }).catch(() => {})
+
     return success(res, { patient }, 201)
   } catch (err) {
     console.error('createPatient error:', err.message)
@@ -161,6 +171,52 @@ const getPatient = async (req, res) => {
   } catch (err) {
     console.error('getPatient error:', err.message)
     return error(res, 'Failed to fetch patient', 500)
+  }
+}
+
+// GET /api/patients/:id/staff-detail
+const getStaffPatientDetail = async (req, res) => {
+  try {
+    const clinicId = req.user.clinicId
+    const patientId = req.params.id
+
+    const patient = await Patient.findOne({
+      where: { id: patientId, clinicId },
+    })
+
+    if (!patient) return error(res, 'Patient not found', 404)
+
+    const [visits, bills, activeToken] = await Promise.all([
+      require('../models').Visit.findAll({
+        where: { patientId, clinicId },
+        order: [['createdAt', 'DESC']],
+        limit: 20,
+        include: [{ association: 'doctor', attributes: ['id', 'name'] }]
+      }),
+      require('../models').Bill.findAll({
+        where: { patientId, clinicId },
+        order: [['createdAt', 'DESC']],
+        limit: 20
+      }),
+      Token.findOne({
+        where: {
+          patientId,
+          clinicId,
+          status: { [Op.in]: ['waiting', 'now', 'paused', 'lab'] },
+          createdAt: { [Op.gte]: new Date(new Date().setHours(0,0,0,0)) }
+        }
+      })
+    ])
+
+    return success(res, {
+      patient,
+      visits,
+      bills,
+      activeToken
+    })
+  } catch (err) {
+    console.error('getStaffPatientDetail error:', err.message)
+    return error(res, 'Failed to fetch patient detail', 500)
   }
 }
 
@@ -186,4 +242,4 @@ const updateOptIn = async (req, res) => {
   }
 }
 
-module.exports = { lookupPatient, createPatient, getPatient, getPatientProfile, getPatientVisits, updateOptIn }
+module.exports = { lookupPatient, createPatient, getPatient, getPatientProfile, getPatientVisits, updateOptIn, getStaffPatientDetail }

@@ -1,6 +1,7 @@
 const { success, error } = require('../utils/apiResponse')
 const { User, Clinic, JoinRequest } = require('../models')
 const { Op } = require('sequelize')
+const { logAudit, ACTIONS } = require('../services/audit.service')
 
 // ── GET /api/admin/stats ──────────────────────────────────────────
 const getStats = async (req, res) => {
@@ -88,15 +89,14 @@ const reviewRequest = async (req, res) => {
       )
     }
 
-    const { writeAudit } = require('../utils/audit')
-    await writeAudit({
-      userId:   req.user.id,
+    logAudit({
+      userId: req.user.id,
+      action: action === 'approve' ? ACTIONS.JOIN_REQUEST_APPROVED : ACTIONS.JOIN_REQUEST_REJECTED,
+      resourceType: 'user',
+      resourceId: request.userId,
       clinicId: req.user.clinicId,
-      action:   `JOIN_REQUEST_${action.toUpperCase()}D`,
-      entity:   'JoinRequest',
-      entityId: request.id,
-      meta:     { targetUserId: request.userId, action },
-    })
+      ip: req.ip
+    }).catch(() => {})
 
     return success(res, { message: `Request ${action}d successfully` })
   } catch (err) {
@@ -153,6 +153,15 @@ const updateMember = async (req, res) => {
     const newStatus = action === 'suspend' ? 'suspended' : 'approved'
     await member.update({ status: newStatus })
 
+    logAudit({
+      userId: req.user.id,
+      action: action === 'suspend' ? ACTIONS.MEMBER_SUSPENDED : ACTIONS.MEMBER_REACTIVATED,
+      resourceType: 'user',
+      resourceId: member.id,
+      clinicId,
+      ip: req.ip
+    }).catch(() => {})
+
     return success(res, { message: `Member ${action}d successfully` })
   } catch (err) {
     console.error('updateMember error:', err.message)
@@ -184,6 +193,15 @@ const updateClinicDetails = async (req, res) => {
 
     await clinic.update({ name, address, phone, specialty })
 
+    logAudit({
+      userId: req.user.id,
+      action: ACTIONS.CLINIC_UPDATED,
+      resourceType: 'clinic',
+      resourceId: clinic.id,
+      clinicId: req.user.clinicId,
+      ip: req.ip
+    }).catch(() => {})
+
     return success(res, { clinic, message: 'Clinic details updated' })
   } catch (err) {
     console.error('updateClinicDetails error:', err.message)
@@ -210,6 +228,66 @@ const getDoctors = async (req, res) => {
   }
 }
 
+// ── GET /api/admin/integrations ───────────────────────────────────────
+const getIntegrations = async (req, res) => {
+  try {
+    const { ClinicSettings } = require('../models')
+    const settings = await ClinicSettings.findOne({ where: { clinicId: req.user.clinicId } })
+    
+    // Mask the keys
+    const maskKey = (key) => key ? `${key.substring(0, 4)}...${key.substring(key.length - 4)}` : null
+    
+    return success(res, { 
+      settings: {
+        razorpayKeyId: maskKey(settings?.razorpayKeyId),
+        razorpayKeySecret: maskKey(settings?.razorpayKeySecret),
+        brevoApiKey: maskKey(settings?.brevoApiKey),
+      } 
+    })
+  } catch (err) {
+    console.error('getIntegrations error:', err.message)
+    return error(res, 'Failed to fetch integrations', 500)
+  }
+}
+
+// ── PATCH /api/admin/integrations ─────────────────────────────────────
+const updateIntegrations = async (req, res) => {
+  const { razorpayKeyId, razorpayKeySecret, brevoApiKey } = req.body
+  try {
+    const { ClinicSettings } = require('../models')
+    const clinicId = req.user.clinicId
+    
+    let settings = await ClinicSettings.findOne({ where: { clinicId } })
+    if (!settings) {
+      settings = await ClinicSettings.create({ clinicId })
+    }
+    
+    // Only update if provided and not masked
+    const updates = {}
+    if (razorpayKeyId && !razorpayKeyId.includes('...')) updates.razorpayKeyId = razorpayKeyId
+    if (razorpayKeySecret && !razorpayKeySecret.includes('...')) updates.razorpayKeySecret = razorpayKeySecret
+    if (brevoApiKey && !brevoApiKey.includes('...')) updates.brevoApiKey = brevoApiKey
+    
+    if (Object.keys(updates).length > 0) {
+      await settings.update(updates)
+      
+      logAudit({
+        userId: req.user.id,
+        action: 'INTEGRATIONS_UPDATED',
+        resourceType: 'clinicSettings',
+        resourceId: settings.id,
+        clinicId: req.user.clinicId,
+        ip: req.ip
+      }).catch(() => {})
+    }
+    
+    return success(res, { message: 'Integrations updated successfully' })
+  } catch (err) {
+    console.error('updateIntegrations error:', err.message)
+    return error(res, 'Failed to update integrations', 500)
+  }
+}
+
 module.exports = {
   getStats,
   getJoinRequests,
@@ -219,4 +297,6 @@ module.exports = {
   getClinicDetails,
   updateClinicDetails,
   getDoctors,
+  getIntegrations,
+  updateIntegrations
 }

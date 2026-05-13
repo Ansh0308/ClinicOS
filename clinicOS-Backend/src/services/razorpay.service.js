@@ -15,22 +15,15 @@ const buildError = (message, statusCode = 500, meta = {}) => {
   return err
 }
 
-const getClient = () => {
-  const keyId = process.env.RAZORPAY_KEY_ID
-  const keySecret = process.env.RAZORPAY_KEY_SECRET
-
+const getClient = (keyId, keySecret) => {
   if (!keyId || !keySecret) {
-    throw buildError('Online payments are not configured on the server.', 503)
+    throw buildError('Online payments are not configured for this clinic.', 503)
   }
 
-  if (!razorpayClient) {
-    razorpayClient = new Razorpay({
-      key_id: keyId,
-      key_secret: keySecret,
-    })
-  }
-
-  return razorpayClient
+  return new Razorpay({
+    key_id: keyId,
+    key_secret: keySecret,
+  })
 }
 
 const parseRazorpayError = (err) => {
@@ -61,7 +54,7 @@ const parseRazorpayError = (err) => {
  * Create a Razorpay order.
  * amount is in INR (rupees) - this function converts to paise internally.
  */
-const createOrder = async ({ amount, currency = 'INR', receipt, notes = {} }) => {
+const createOrder = async ({ amount, currency = 'INR', receipt, notes = {}, keyId, keySecret }) => {
   const normalizedAmount = Number(amount)
 
   if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
@@ -69,7 +62,7 @@ const createOrder = async ({ amount, currency = 'INR', receipt, notes = {} }) =>
   }
 
   try {
-    const razorpay = getClient()
+    const razorpay = getClient(keyId, keySecret)
     const order = await razorpay.orders.create({
       amount: Math.round(normalizedAmount * 100), // Razorpay requires paise (INR 1 = 100 paise)
       currency,
@@ -86,14 +79,14 @@ const createOrder = async ({ amount, currency = 'INR', receipt, notes = {} }) =>
  * Verify payment signature - CRITICAL for security.
  * Without this check anyone could fake a payment.
  */
-const verifySignature = (orderId, paymentId, signature) => {
-  if (!process.env.RAZORPAY_KEY_SECRET) {
-    throw buildError('Online payments are not configured on the server.', 503)
+const verifySignature = (orderId, paymentId, signature, keySecret) => {
+  if (!keySecret) {
+    throw buildError('Online payments are not configured for this clinic.', 503)
   }
 
   const body     = orderId + '|' + paymentId
   const expected = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+    .createHmac('sha256', keySecret)
     .update(body)
     .digest('hex')
 

@@ -1,8 +1,8 @@
-const sendMail = async ({ to, subject, html, attachments }) => {
-  const brevoApiKey = process.env.BREVO_API_KEY
+const sendMail = async ({ to, subject, html, attachments, brevoApiKey }) => {
+  const apiKey = brevoApiKey || process.env.BREVO_API_KEY
 
   // If no API key is provided, log to console and skip (prevents 500 error & timeout)
-  if (!brevoApiKey) {
+  if (!apiKey) {
     console.warn('\n⚠️ [Mailer] BREVO_API_KEY is not set! Skipping email delivery.')
     console.warn(`⚠️ [Mailer] Would have sent to: ${to} | Subject: ${subject}\n`)
     return { success: false, message: 'Email skipped - No API Key' }
@@ -40,7 +40,7 @@ const sendMail = async ({ to, subject, html, attachments }) => {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'api-key': brevoApiKey
+        'api-key': apiKey
       },
       body: JSON.stringify(payload)
     })
